@@ -33,24 +33,48 @@ export default function Home() {
   return (
     <div className="bg-white min-h-screen font-sans">
       
-      {/* USP Banner (Horizontal Scroll) */}
-      <div className="bg-slate-50 border-b border-slate-100 overflow-x-auto no-scrollbar">
-        <div className="container mx-auto px-6 py-3 min-w-max flex items-center justify-center gap-12 text-sm font-bold text-slate-700 uppercase tracking-wide">
-          <div className="flex items-center gap-3">
-            <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-            <span>Premium Peptides</span>
+      {/* USP Banner (Auto-scrolling marquee) */}
+      <div className="bg-slate-50 border-b border-slate-100 overflow-hidden">
+        <div className="vl-marquee">
+          <div className="vl-marquee__track text-sm font-bold text-slate-700 uppercase tracking-wide">
+            <div className="flex items-center justify-center gap-12 px-6 py-3">
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <span>Premium Peptides</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                <span>Free Shipping Over $200</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>Lab Verified &gt;99%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                <span>Secure Payment</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            <span>Free Shipping Over $200</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span>Lab Verified &gt;99%</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-            <span>Secure Payment</span>
+          <div className="vl-marquee__track text-sm font-bold text-slate-700 uppercase tracking-wide" aria-hidden="true">
+            <div className="flex items-center justify-center gap-12 px-6 py-3">
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <span>Premium Peptides</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                <span>Free Shipping Over $200</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>Lab Verified &gt;99%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                <span>Secure Payment</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

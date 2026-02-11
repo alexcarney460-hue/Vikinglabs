@@ -16,3 +16,32 @@ body {
 .great-vibes {
   font-family: 'Great Vibes', cursive !important;
 }
+
+/* Viking Labs: marquee used on home USP banner */
+.vl-marquee {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+}
+
+.vl-marquee__track {
+  width: max-content;
+  display: flex;
+  will-change: transform;
+  animation: vl-marquee-left 18s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vl-marquee__track {
+    animation: none;
+  }
+}
+
+@keyframes vl-marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
