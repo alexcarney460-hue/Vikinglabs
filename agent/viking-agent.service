@@ -1,0 +1,19 @@
+[Unit]
+Description=Viking Labs Subagent
+After=network.target
+
+[Service]
+Type=simple
+User=claud
+WorkingDirectory=/opt/viking-agent
+EnvironmentFile=/opt/viking-agent/.env
+ExecStart=/usr/bin/node /opt/viking-agent/agent.js
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=viking-agent
+
+[Install]
+WantedBy=multi-user.target

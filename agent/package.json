@@ -1,0 +1,14 @@
+{
+  "name": "viking-subagent",
+  "version": "0.1.0",
+  "private": true,
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "node-fetch": "^3.0.0",
+    "date-fns": "^2.0.0"
+  }
+}
