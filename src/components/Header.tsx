@@ -26,9 +26,15 @@ export default function Header() {
         <Link href="/" className="flex items-center gap-3 group" onClick={() => setMenuOpen(false)}>
           <div className="relative h-16 w-40 shrink-0 transition-transform group-hover:scale-105">
             <picture>
-              <source srcSet="/optimized/logo-primary-640.webp" type="image/webp" />
-              <source srcSet="/optimized/logo-primary-640.avif" type="image/avif" />
-              <img src="/logo-primary.png" alt="Viking Labs" width={200} height={80} className="object-contain" />
+              <source srcSet="/optimized/logo-640.avif" type="image/avif" />
+              <source srcSet="/optimized/logo-640.webp" type="image/webp" />
+              <img
+                src="/logo-primary.png"
+                alt="Viking Labs"
+                width={200}
+                height={80}
+                className="object-contain"
+              />
             </picture>
           </div>
         </Link>
