@@ -24,7 +24,7 @@ export default function Header() {
       <div className="container mx-auto flex h-24 items-center justify-between px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group" onClick={() => setMenuOpen(false)}>
-          <div className="relative -mt-8 h-16 w-56 shrink-0 transition-transform group-hover:scale-105">
+          <div className="relative mt-8 h-16 w-56 shrink-0 transition-transform group-hover:scale-105">
             <img
               src="/logo-header.png"
               alt="Viking Labs"
