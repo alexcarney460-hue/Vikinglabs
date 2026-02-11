@@ -97,7 +97,7 @@ export default function Home() {
                 </h1>
                 
                 <p className="text-base lg:text-lg text-slate-600 leading-relaxed max-w-md mx-auto lg:mx-0">
-                  Viking Labs operates with transparency and integrity, providing detailed HPLC analysis and sterility data for every batch.
+                  Viking Labs operates with transparency and integrity, providing detailed HPLC analysis and sterility data for every batch. The categories below are curated product lists to help you quickly find and select what you need.
                 </p>
                 
                 <div className="pt-4 space-y-4">
