@@ -24,12 +24,14 @@ export default function Header() {
       <div className="container mx-auto flex h-24 items-center justify-between px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group" onClick={() => setMenuOpen(false)}>
-          <div className="relative h-16 w-40 shrink-0 transition-transform group-hover:scale-105">
-            <picture>
-              <source srcSet="/optimized/logo-primary-640.webp" type="image/webp" />
-              <source srcSet="/optimized/logo-primary-640.avif" type="image/avif" />
-              <img src="/logo-primary.png" alt="Viking Labs" width={200} height={80} className="object-contain" />
-            </picture>
+          <div className="relative h-16 w-56 shrink-0 transition-transform group-hover:scale-105">
+            <img
+              src="/logo-header.jpg"
+              alt="Viking Labs"
+              width={260}
+              height={80}
+              className="object-contain"
+            />
           </div>
         </Link>
 
