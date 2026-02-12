@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authjs/options';
-import { updateAffiliateStatus } from '@/lib/affiliates';
+import { updateAffiliateApplication } from '@/lib/affiliates';
 import type { AffiliateStatus } from '@/lib/affiliates';
 
-const allowed = new Set<AffiliateStatus>(['approved', 'declined', 'pending']);
+const allowed = new Set<AffiliateStatus>(['approved', 'declined', 'pending', 'needs_info']);
 
 export async function PATCH(req: Request, context: any) {
   const paramsRaw = context?.params;
@@ -24,12 +24,28 @@ export async function PATCH(req: Request, context: any) {
 
   try {
     const body = await req.json();
-    const status = typeof body?.status === 'string' ? (body.status as AffiliateStatus) : null;
-    if (!status || !allowed.has(status)) {
+    const status = typeof body?.status === 'string' ? (body.status as AffiliateStatus) : undefined;
+    if (status && !allowed.has(status)) {
       return NextResponse.json({ error: 'Invalid status.' }, { status: 400 });
     }
 
-    const updated = await updateAffiliateStatus(id, status);
+    const signupCreditCents = Number.isFinite(body?.signupCreditCents)
+      ? Number(body.signupCreditCents)
+      : undefined;
+    const discordUserId = typeof body?.discordUserId === 'string' ? body.discordUserId.trim() || null : undefined;
+    const autoInvite = Boolean(body?.autoInvite);
+
+    if (!status && signupCreditCents === undefined && discordUserId === undefined) {
+      return NextResponse.json({ error: 'No changes provided.' }, { status: 400 });
+    }
+
+    const updated = await updateAffiliateApplication({
+      id,
+      status,
+      signupCreditCents,
+      discordUserId,
+      autoInvite,
+    });
     if (!updated) {
       return NextResponse.json({ error: 'Not found.' }, { status: 404 });
     }

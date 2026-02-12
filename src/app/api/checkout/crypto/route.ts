@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resources } from '@/lib/coinbase';
+import { AFFILIATE_COOKIE_NAME } from '@/lib/affiliate-cookies';
+import { getAffiliateByCode, recordOrderAffiliate } from '@/lib/affiliates';
 
 const Charge = resources?.Charge ?? null;
 
@@ -32,6 +34,10 @@ export async function POST(req: NextRequest) {
     }
 
     const amount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const amountCents = Math.round(amount * 100);
+
+    const affiliateCode = req.cookies.get(AFFILIATE_COOKIE_NAME)?.value;
+    const affiliate = affiliateCode ? await getAffiliateByCode(affiliateCode) : null;
 
     const origin = req.headers.get('origin') ?? 'http://localhost:3000';
 
@@ -46,10 +52,30 @@ export async function POST(req: NextRequest) {
       metadata: {
         email,
         items: JSON.stringify(items),
+        affiliate_code: affiliate?.code || affiliateCode || '',
+        affiliate_id: affiliate?.id || '',
+        affiliate_signup_credit_cents: affiliate ? affiliate.signupCreditCents.toString() : '0',
       },
       redirect_url: `${origin}/checkout/success?method=crypto`,
       cancel_url: `${origin}/checkout/cancel?method=crypto`,
     });
+
+    if (affiliate) {
+      recordOrderAffiliate({
+        provider: 'coinbase',
+        orderId: charge.id,
+        affiliateId: affiliate.id,
+        code: affiliate.code || affiliateCode || null,
+        amountCents,
+        currency: 'usd',
+        metadata: {
+          email,
+          items,
+        },
+      }).catch((error) => {
+        console.error('Order affiliate record failed', error);
+      });
+    }
 
     return NextResponse.json({ hosted_url: charge.hosted_url });
   } catch (error) {

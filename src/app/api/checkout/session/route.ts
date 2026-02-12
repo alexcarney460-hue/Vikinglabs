@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { AFFILIATE_COOKIE_NAME } from '@/lib/affiliate-cookies';
+import { getAffiliateByCode, recordOrderAffiliate } from '@/lib/affiliates';
 
 interface CartItemPayload {
   id: string;
@@ -33,6 +35,9 @@ export async function POST(req: NextRequest) {
     }
 
     const mode: 'payment' | 'subscription' = hasAutoship ? 'subscription' : 'payment';
+
+    const affiliateCode = req.cookies.get(AFFILIATE_COOKIE_NAME)?.value;
+    const affiliate = affiliateCode ? await getAffiliateByCode(affiliateCode) : null;
 
     const lineItems = items.map((item) => {
       const base: {
@@ -72,6 +77,9 @@ export async function POST(req: NextRequest) {
       return base;
     });
 
+    const subtotalCents = items.reduce((sum, item) => sum + Math.round(item.price * 100) * item.quantity, 0);
+    const shippingCents = Math.round(shippingCost * 100);
+
     if (shippingCost > 0) {
       lineItems.push({
         price_data: {
@@ -83,11 +91,20 @@ export async function POST(req: NextRequest) {
               plan: 'one-time',
             },
           },
-          unit_amount: Math.round(shippingCost * 100),
+          unit_amount: shippingCents,
         },
         quantity: 1,
       });
     }
+
+    const orderTotalCents = subtotalCents + shippingCents;
+    const affiliateMetadata = affiliate
+      ? {
+          affiliate_code: affiliate.code || affiliateCode || '',
+          affiliate_id: affiliate.id,
+          affiliate_signup_credit_cents: affiliate.signupCreditCents.toString(),
+        }
+      : {};
 
     const origin = req.headers.get('origin') ?? 'http://localhost:3000';
 
@@ -109,13 +126,34 @@ export async function POST(req: NextRequest) {
         ? {
             metadata: {
               autoship: 'true',
+              ...affiliateMetadata,
             },
           }
         : undefined,
       metadata: {
         autoship: hasAutoship ? 'true' : 'false',
+        order_total_cents: orderTotalCents.toString(),
+        ...affiliateMetadata,
       },
     });
+
+    if (affiliate) {
+      recordOrderAffiliate({
+        provider: 'stripe',
+        orderId: session.id,
+        affiliateId: affiliate.id,
+        code: affiliate.code || affiliateCode || null,
+        amountCents: orderTotalCents,
+        currency: 'usd',
+        metadata: {
+          email,
+          items,
+          shippingCost,
+        },
+      }).catch((error) => {
+        console.error('Order affiliate record failed', error);
+      });
+    }
 
     return NextResponse.json({ id: session.id, url: session.url });
   } catch (error: unknown) {

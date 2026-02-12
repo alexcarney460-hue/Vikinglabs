@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authjs/options';
-import { listAffiliateApplications } from '@/lib/affiliates';
+import { listAffiliateApplications, listAffiliateStats } from '@/lib/affiliates';
 import AffiliateApplications from '@/components/admin/AffiliateApplications';
 
 export default async function AffiliateAdminPage() {
@@ -32,20 +32,25 @@ export default async function AffiliateAdminPage() {
     );
   }
 
-  const applications = await listAffiliateApplications('pending');
+  const applications = await listAffiliateApplications();
+  const stats = await listAffiliateStats(applications.map((app) => app.id));
+  const enriched = applications.map((app) => ({
+    ...app,
+    stats: stats[app.id],
+  }));
 
   return (
     <div className="container mx-auto px-6 py-12 max-w-6xl">
       <div className="flex items-start justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Affiliate Applications</h1>
-          <p className="mt-2 text-slate-600">Review pending affiliate requests and approve or decline.</p>
+          <p className="mt-2 text-slate-600">Review affiliate requests, manage approvals, and monitor performance.</p>
         </div>
         <Link href="/account/admin" className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-300">Back to admin</Link>
       </div>
 
       <div className="mt-8">
-        <AffiliateApplications initialApplications={applications} />
+        <AffiliateApplications initialApplications={enriched} />
       </div>
     </div>
   );
