@@ -91,6 +91,11 @@ export async function POST(req: NextRequest) {
 
     const origin = req.headers.get('origin') ?? 'http://localhost:3000';
 
+    if (!stripe) {
+      console.error('[Stripe] STRIPE_SECRET_KEY not configured');
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode,
       customer_email: email,
