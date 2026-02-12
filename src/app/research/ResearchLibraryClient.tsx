@@ -129,16 +129,12 @@ export default function ResearchLibraryClient() {
                         View product
                       </Link>
                     )}
-                    {it.publicUrl && (
-                      <a
-                        href={it.publicUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 hover:bg-emerald-200"
-                      >
-                        Open doc
-                      </a>
-                    )}
+                    <Link
+                      href={`/research/${it.id}`}
+                      className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 hover:bg-emerald-200"
+                    >
+                      Open doc
+                    </Link>
                   </div>
                 </div>
 
