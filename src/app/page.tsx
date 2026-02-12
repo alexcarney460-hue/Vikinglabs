@@ -125,7 +125,7 @@ export default function Home() {
                   alt="Viking Labs Epitalon and CJC/Ipamorelin vials" 
                   width={450}
                   height={600}
-                  className="max-w-full max-h-full drop-shadow-2xl lg:-translate-x-[50px]"
+                  className="max-w-full max-h-full drop-shadow-2xl lg:-translate-x-[25px]"
                   priority
                 />
                 <div className="absolute inset-0 scale-105 blur-3xl bg-amber-200/10 rounded-full -z-10"></div>
