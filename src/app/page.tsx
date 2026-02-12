@@ -121,7 +121,7 @@ export default function Home() {
               {/* Right Graphics (Mobile: Top, Desktop: Right) */}
               <div className="order-1 lg:order-2 relative h-[300px] lg:h-[450px] w-full flex items-center justify-center">
                  <Image 
-                  src="/hero-vials.jpg" 
+                  src="/hero-vials-top.jpg" 
                   alt="Viking Labs Epitalon and CJC/Ipamorelin vials" 
                   width={450}
                   height={600}
