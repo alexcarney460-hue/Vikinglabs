@@ -6,12 +6,20 @@ import type { AffiliateStatus } from '@/lib/affiliates';
 
 const allowed = new Set<AffiliateStatus>(['approved', 'declined', 'pending']);
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, context: any) {
+  const paramsRaw = context?.params;
+  const params = (typeof paramsRaw?.then === 'function') ? await paramsRaw : paramsRaw;
+  const id = params?.id as string | undefined;
+
   const session = await getServerSession(authOptions);
   const user = session?.user as { role?: string } | undefined;
 
   if (!user || (user.role ?? 'user') !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!id) {
+    return NextResponse.json({ error: 'Missing id.' }, { status: 400 });
   }
 
   try {
@@ -21,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'Invalid status.' }, { status: 400 });
     }
 
-    const updated = await updateAffiliateStatus(params.id, status);
+    const updated = await updateAffiliateStatus(id, status);
     if (!updated) {
       return NextResponse.json({ error: 'Not found.' }, { status: 404 });
     }
