@@ -119,13 +119,12 @@ export default function Home() {
               </div>
 
               {/* Right Graphics (Mobile: Top, Desktop: Right) */}
-              <div className="order-1 lg:order-2 relative h-[300px] lg:h-[450px] w-full flex items-center justify-center">
+              <div className="order-1 lg:order-2 relative h-[300px] lg:h-[450px] w-full flex items-center justify-center max-h-[55vh] overflow-hidden">
                  <Image 
                   src="/hero-vials-top.jpg" 
                   alt="Viking Labs Epitalon and CJC/Ipamorelin vials" 
-                  width={450}
-                  height={600}
-                  className="max-w-full max-h-full drop-shadow-2xl lg:-translate-x-[25px]"
+                  fill
+                  className="object-cover object-top w-full h-full drop-shadow-2xl lg:-translate-x-[25px]"
                   priority
                 />
                 <div className="absolute inset-0 scale-105 blur-3xl bg-amber-200/10 rounded-full -z-10"></div>
