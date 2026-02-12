@@ -120,13 +120,10 @@ export default function Home() {
 
               {/* Right Graphics (Mobile: Top, Desktop: Right) */}
               <div className="order-1 lg:order-2 relative h-[300px] lg:h-[450px] w-full flex items-center justify-center max-h-[55vh] overflow-hidden">
-                 <Image 
-                  src="/hero-vials-top.jpg" 
-                  alt="Viking Labs Epitalon and CJC/Ipamorelin vials" 
-                  fill
-                  className="object-cover object-top w-full h-full drop-shadow-2xl lg:-translate-x-[25px]"
-                  priority
-                />
+                <picture className="w-full h-full block">
+                  <source media="(min-width: 1024px)" srcSet="/hero-vials.jpg" />
+                  <img src="/hero-vials-top.jpg" alt="Viking Labs Epitalon and CJC/Ipamorelin vials" className="w-full h-full object-cover object-top lg:object-contain lg:object-center drop-shadow-2xl lg:-translate-x-[25px]" />
+                </picture>
                 <div className="absolute inset-0 scale-105 blur-3xl bg-amber-200/10 rounded-full -z-10"></div>
               </div>
             </div>
