@@ -1,7 +1,4 @@
-'use client';
-
 import Link from 'next/link';
-import AffiliateForm from '@/components/forms/AffiliateForm';
 
 const perks = [
   {
@@ -54,9 +51,9 @@ export default function AffiliatesPage() {
             Earn recurring revenue by referring researchers to our GMP-produced peptide catalog. Instant onboarding, transparent dashboards, and rapid payouts.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="#affiliate-form" className="inline-flex items-center justify-center rounded-full bg-amber-500 px-8 py-4 text-sm font-bold text-white shadow-lg shadow-amber-500/30 transition-all hover:bg-amber-600">
+            <Link href="/affiliates/apply" className="inline-flex items-center justify-center rounded-full bg-amber-500 px-8 py-4 text-sm font-bold text-white shadow-lg shadow-amber-500/30 transition-all hover:bg-amber-600">
               Apply Now
-            </a>
+            </Link>
             <Link href="/contact" className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-8 py-4 text-sm font-bold text-slate-700 hover:border-amber-500">
               Talk to a Partner Manager
             </Link>
@@ -97,16 +94,6 @@ export default function AffiliatesPage() {
             <p className="mt-3 text-sm text-slate-600">{faq.a}</p>
           </details>
         ))}
-      </section>
-
-      <section id="affiliate-form" className="container mx-auto px-6 max-w-4xl py-12">
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Affiliate Application</h2>
-          <p className="text-sm text-slate-600 mb-6">
-            Submit your info and we’ll send over assets, private codes, and onboarding instructions within one business day.
-          </p>
-          <AffiliateForm />
-        </div>
       </section>
 
       <section className="container mx-auto px-6 max-w-5xl">

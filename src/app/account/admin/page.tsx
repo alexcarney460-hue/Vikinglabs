@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/authjs/options';
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
-  const user = session?.user as any | undefined;
+  const user = session?.user as { role?: string } | undefined;
 
   if (!user) {
     return (
@@ -40,12 +40,20 @@ export default async function AdminPage() {
         <Link href="/account" className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-300">Back to account</Link>
       </div>
 
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
+      <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">Library Admin</h2>
           <p className="mt-2 text-sm text-slate-600">Create/edit research items, upload PDFs/COAs, publish.</p>
           <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             Next: admin upload UI + publish workflow.
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">Affiliate Applications</h2>
+          <p className="mt-2 text-sm text-slate-600">Review pending affiliate requests and approve or decline.</p>
+          <div className="mt-5">
+            <Link href="/account/admin/affiliates" className="text-sm font-semibold text-amber-600 hover:text-amber-700">Open affiliate queue →</Link>
           </div>
         </div>
 

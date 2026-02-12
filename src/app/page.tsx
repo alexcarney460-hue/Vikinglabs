@@ -332,7 +332,7 @@ export default function Home() {
             <Link href="/affiliates" className="inline-flex items-center justify-center rounded-full bg-slate-900 px-8 py-4 text-sm font-bold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800">
               View Affiliate Details
             </Link>
-            <Link href="https://forms.gle/affiliates" target="_blank" className="inline-flex items-center justify-center rounded-full border-2 border-amber-500 px-8 py-4 text-sm font-bold text-amber-600 hover:bg-amber-50">
+            <Link href="/affiliates/apply" className="inline-flex items-center justify-center rounded-full border-2 border-amber-500 px-8 py-4 text-sm font-bold text-amber-600 hover:bg-amber-50">
               Apply Now
             </Link>
           </div>
