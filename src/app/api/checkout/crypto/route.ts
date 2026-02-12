@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resources } from '@/lib/coinbase';
 
-const { Charge } = resources;
+const Charge = resources?.Charge ?? null;
 
 interface CartItemPayload {
   id: string;
