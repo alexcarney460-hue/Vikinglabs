@@ -56,13 +56,18 @@ export async function createAffiliateApplication(input: {
   };
 
   if (hasDatabase()) {
-    await sql`
-      INSERT INTO affiliate_applications
-      (id, name, email, social_handle, audience_size, channels, notes, status, created_at, updated_at)
-      VALUES
-      (${record.id}, ${record.name}, ${record.email}, ${record.socialHandle}, ${record.audienceSize}, ${record.channels}, ${record.notes}, ${record.status}, ${record.createdAt}, ${record.updatedAt})
-    `;
-    return record;
+    try {
+      await sql`
+        INSERT INTO affiliate_applications
+        (id, name, email, social_handle, audience_size, channels, notes, status, created_at, updated_at)
+        VALUES
+        (${record.id}, ${record.name}, ${record.email}, ${record.socialHandle}, ${record.audienceSize}, ${record.channels}, ${record.notes}, ${record.status}, ${record.createdAt}, ${record.updatedAt})
+      `;
+      return record;
+    } catch (dbError) {
+      console.error('Affiliate DB insert failed, falling back to file storage', dbError);
+      // fallback to file storage if DB insert fails (e.g., table missing in preview)
+    }
   }
 
   const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
