@@ -86,12 +86,7 @@ export default function Home() {
             <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center p-8 lg:p-12">
               {/* Left Content (Mobile: Bottom, Desktop: Left) */}
               <div className="order-2 lg:order-1 space-y-6 text-center lg:text-left">
-                <div className="flex justify-center lg:justify-start">
-                   <div className="relative h-16 w-40">
-                      <Image src="/logo-primary.png" alt="Viking Labs" fill className="object-contain" />
-                   </div>
-                </div>
-                
+
                 <h1 className="text-3xl lg:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
                   Proudly offering <span className="text-amber-600">top-quality peptides</span> for research.
                 </h1>
