@@ -29,9 +29,12 @@ const curatedCategories = [
   },
 ];
 
+import AgeVerify from '../components/AgeVerify';
+
 export default function Home() {
   return (
     <div className="bg-white min-h-screen font-sans">
+      <AgeVerify />
       
       {/* USP Banner (Auto-scrolling marquee) */}
       <div className="bg-slate-50 border-b border-slate-100 overflow-hidden">
