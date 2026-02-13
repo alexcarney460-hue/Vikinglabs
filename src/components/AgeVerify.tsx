@@ -1,10 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+const SESSION_KEY = 'vl_age_shown';
 
 export default function AgeVerify() {
-  // Always show on each page load (do not persist via cookie)
-  const [shown, setShown] = useState(true);
+  // show once per browser session using sessionStorage
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    try {
+      const shownFlag = typeof window !== 'undefined' ? window.sessionStorage.getItem(SESSION_KEY) : null;
+      if (!shownFlag) setShown(true);
+    } catch {
+      // if sessionStorage inaccessible, fall back to showing
+      setShown(true);
+    }
+  }, []);
 
   if (!shown) return null;
 
@@ -18,7 +30,7 @@ export default function AgeVerify() {
           </div>
           <div className="ml-0 md:ml-4 flex-shrink-0">
             <button
-              onClick={() => { setShown(false); }}
+              onClick={() => { try { window.sessionStorage.setItem(SESSION_KEY, '1'); } catch {} setShown(false); }}
               className="inline-flex items-center justify-center rounded-full bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-amber-400"
               aria-label="Confirm you are 21 or older"
             >
