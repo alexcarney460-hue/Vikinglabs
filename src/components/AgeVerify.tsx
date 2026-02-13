@@ -1,28 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-const COOKIE_NAME = 'vl_age_verified';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
-
-function getCookie(name: string) {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function setCookie(name: string, value: string, maxAgeSec: number) {
-  if (typeof document === 'undefined') return;
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeSec}; SameSite=Lax`;
-}
+import { useState } from 'react';
 
 export default function AgeVerify() {
-  const [shown, setShown] = useState(false);
-
-  useEffect(() => {
-    const ok = getCookie(COOKIE_NAME);
-    if (!ok) setShown(true);
-  }, []);
+  // Always show on each page load (do not persist via cookie)
+  const [shown, setShown] = useState(true);
 
   if (!shown) return null;
 
@@ -36,7 +18,7 @@ export default function AgeVerify() {
           </div>
           <div className="ml-0 md:ml-4 flex-shrink-0">
             <button
-              onClick={() => { setCookie(COOKIE_NAME, '1', COOKIE_MAX_AGE); setShown(false); }}
+              onClick={() => { setShown(false); }}
               className="inline-flex items-center justify-center rounded-full bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-amber-400"
               aria-label="Confirm you are 21 or older"
             >
