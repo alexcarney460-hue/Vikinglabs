@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     }
 
     const orderTotalCents = subtotalCents + shippingCents;
-    const affiliateMetadata = affiliate
+    const affiliateMetadata: Record<string, string> = affiliate
       ? {
           affiliate_code: affiliate.code || affiliateCode || '',
           affiliate_id: affiliate.id,
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const params = {
       mode,
       customer_email: email,
       line_items: lineItems,
@@ -135,7 +135,9 @@ export async function POST(req: NextRequest) {
         order_total_cents: orderTotalCents.toString(),
         ...affiliateMetadata,
       },
-    });
+    } satisfies import('stripe').Stripe.Checkout.SessionCreateParams;
+
+    const session = await stripe.checkout.sessions.create(params);
 
     if (affiliate) {
       recordOrderAffiliate({

@@ -432,7 +432,7 @@ export async function recordOrderAffiliate(input: {
       INSERT INTO order_affiliates
       (id, provider, order_id, affiliate_id, code, amount_cents, currency, metadata, created_at)
       VALUES
-      (${record.id}, ${record.provider}, ${record.orderId}, ${record.affiliateId}, ${record.code}, ${record.amountCents}, ${record.currency}, ${record.metadata}, ${record.createdAt})
+      (${record.id}, ${record.provider}, ${record.orderId}, ${record.affiliateId}, ${record.code}, ${record.amountCents}, ${record.currency}, ${record.metadata ? JSON.stringify(record.metadata) : null}, ${record.createdAt})
     `;
     return;
   }
@@ -451,20 +451,27 @@ export async function listAffiliateStats(ids: string[]): Promise<Record<string, 
   if (ids.length === 0) return map;
 
   if (hasDatabase()) {
-    const clicks = await sql`
+    const clicks = await sql.query(
+      `
       SELECT affiliate_id AS "affiliateId", COUNT(*)::int AS clicks
       FROM affiliate_clicks
-      WHERE affiliate_id = ANY(${ids})
+      WHERE affiliate_id = ANY($1::uuid[])
       GROUP BY affiliate_id
-    `;
-    const orders = await sql`
+      `,
+      [ids]
+    );
+
+    const orders = await sql.query(
+      `
       SELECT affiliate_id AS "affiliateId",
              COUNT(*)::int AS orders,
              COALESCE(SUM(amount_cents), 0)::int AS "revenueCents"
       FROM order_affiliates
-      WHERE affiliate_id = ANY(${ids})
+      WHERE affiliate_id = ANY($1::uuid[])
       GROUP BY affiliate_id
-    `;
+      `,
+      [ids]
+    );
 
     for (const row of clicks.rows as Array<{ affiliateId: string; clicks: number }>) {
       if (map[row.affiliateId]) map[row.affiliateId].clicks = row.clicks;

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAffiliateByCode, recordAffiliateClick } from '@/lib/affiliates';
 import { AFFILIATE_COOKIE_MAX_AGE, AFFILIATE_COOKIE_NAME } from '@/lib/affiliate-cookies';
 
-export async function GET(req: NextRequest, context: { params: { code: string } }) {
-  const code = context?.params?.code;
+export async function GET(req: NextRequest, context: { params: Promise<{ code: string }> }) {
+  const { code } = await context.params;
   const origin = req.nextUrl.origin;
 
   if (!code) {
