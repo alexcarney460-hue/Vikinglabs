@@ -9,7 +9,7 @@
     "start": "next start",
     "preview:static": "npx serve public -s",
     "lint": "eslint",
-    "test": "tsx --test"
+    "test": "npx tsx --test"
   },
   "dependencies": {
     "@stripe/stripe-js": "^8.7.0",
