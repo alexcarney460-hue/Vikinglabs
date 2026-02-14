@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { getSupabase, hasSupabase } from './supabase';
 import { getSql, hasPooledDatabase } from './db';
 import { readJson, writeJson } from './storage';
 
@@ -19,27 +20,7 @@ const STORAGE_FILE = 'orders.json';
 const EMPTY: Store = { orders: [] };
 
 function hasDatabase() {
-  return hasPooledDatabase();
-}
-
-async function ensureTables() {
-  const sql = await getSql();
-  if (!sql) return;
-  await sql`
-    CREATE TABLE IF NOT EXISTS orders (
-      id uuid PRIMARY KEY,
-      provider text NOT NULL,
-      provider_order_id text NOT NULL,
-      email text NOT NULL,
-      amount_cents int NOT NULL,
-      currency text NOT NULL,
-      autoship boolean NOT NULL DEFAULT false,
-      items jsonb NULL,
-      created_at timestamptz NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders (created_at DESC);
-    CREATE INDEX IF NOT EXISTS orders_provider_order_id_idx ON orders (provider_order_id);
-  `;
+  return hasSupabase() || hasPooledDatabase();
 }
 
 export async function recordOrder(input: Omit<OrderRecord, 'id' | 'createdAt'>): Promise<OrderRecord> {
@@ -50,10 +31,28 @@ export async function recordOrder(input: Omit<OrderRecord, 'id' | 'createdAt'>):
     ...input,
   };
 
-  if (hasDatabase()) {
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    const { error } = await supabase.from('orders').upsert({
+      id: record.id,
+      provider: record.provider,
+      provider_order_id: record.providerOrderId,
+      email: record.email,
+      amount_cents: record.amountCents,
+      currency: record.currency,
+      autoship: record.autoship,
+      items: record.items,
+      created_at: record.createdAt,
+    }, { onConflict: 'id' });
+    if (!error) return record;
+    console.error('[orders] Supabase insert error:', error.message);
+  }
+
+  // Fallback to @vercel/postgres
+  if (hasPooledDatabase()) {
     const sql = await getSql();
     if (sql) {
-      await ensureTables();
       await sql`
         INSERT INTO orders
           (id, provider, provider_order_id, email, amount_cents, currency, autoship, items, created_at)
@@ -65,6 +64,7 @@ export async function recordOrder(input: Omit<OrderRecord, 'id' | 'createdAt'>):
     }
   }
 
+  // Fallback to file storage
   const store = await readJson<Store>(STORAGE_FILE, EMPTY);
   store.orders.unshift(record);
   await writeJson(STORAGE_FILE, store);
@@ -72,23 +72,40 @@ export async function recordOrder(input: Omit<OrderRecord, 'id' | 'createdAt'>):
 }
 
 export async function listOrders(limit = 200): Promise<OrderRecord[]> {
-  if (hasDatabase()) {
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, provider, provider_order_id, email, amount_cents, currency, autoship, items, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (!error && data) {
+      return data.map((r: any) => ({
+        id: r.id,
+        provider: r.provider,
+        providerOrderId: r.provider_order_id,
+        email: r.email,
+        amountCents: r.amount_cents,
+        currency: r.currency,
+        autoship: r.autoship,
+        items: r.items,
+        createdAt: r.created_at,
+      }));
+    }
+    if (error) console.error('[orders] Supabase query error:', error.message);
+  }
+
+  // Fallback to @vercel/postgres
+  if (hasPooledDatabase()) {
     const sql = await getSql();
     if (sql) {
-      await ensureTables();
       const rows = await sql`
-        SELECT id,
-               provider,
-               provider_order_id AS "providerOrderId",
-               email,
-               amount_cents AS "amountCents",
-               currency,
-               autoship,
-               items,
-               created_at AS "createdAt"
-        FROM orders
-        ORDER BY created_at DESC
-        LIMIT ${limit}
+        SELECT id, provider, provider_order_id AS "providerOrderId",
+               email, amount_cents AS "amountCents", currency,
+               autoship, items, created_at AS "createdAt"
+        FROM orders ORDER BY created_at DESC LIMIT ${limit}
       `;
       return rows.rows as OrderRecord[];
     }
