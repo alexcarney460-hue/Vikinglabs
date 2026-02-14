@@ -1,14 +1,23 @@
 import { ensureDatabaseEnv } from './db-env';
-import { createPool } from '@vercel/postgres';
 
 type SqlTag = (strings: TemplateStringsArray, ...values: any[]) => Promise<any>;
 
-let cachedSql: SqlTag | null = null;
+let cachedSql: SqlTag | null | undefined;
 
 function getConnectionUrl(): string | undefined {
   ensureDatabaseEnv();
-  // Prioritize pooled connection (Prisma Accelerate) over direct connections
-  return process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  return process.env.POSTGRES_URL || process.env.DATABASE_URL || undefined;
+}
+
+function isPooledConnectionString(url: string): boolean {
+  const lowered = url.toLowerCase();
+  // Prisma Accelerate URLs are NOT direct postgres connections
+  if (lowered.startsWith('prisma+postgres://')) return false;
+  if (lowered.includes('db.prisma.io')) return false;
+  // Neon/Supabase pooled connections
+  if (lowered.includes('-pooler.') || lowered.includes(':6543')) return true;
+  if (lowered.includes('pgbouncer=true')) return true;
+  return false;
 }
 
 export function hasPooledDatabase() {
@@ -16,17 +25,33 @@ export function hasPooledDatabase() {
 }
 
 export async function getSql(): Promise<SqlTag | null> {
-  if (cachedSql !== null) return cachedSql;
+  if (cachedSql !== undefined) return cachedSql;
+
+  const dbUrl = getConnectionUrl();
+  if (!dbUrl) {
+    console.error('[db] No database URL found. Checked POSTGRES_URL, DATABASE_URL');
+    console.error('[db] Available env keys:', Object.keys(process.env).filter(k => /postgres|database|prisma/i.test(k)).join(', '));
+    cachedSql = null;
+    return null;
+  }
+
   try {
-    const dbUrl = getConnectionUrl();
-    if (!dbUrl) {
-      console.error('[db] No database URL found. Checked POSTGRES_URL, POSTGRES_PRISMA_URL, DATABASE_URL');
-      console.error('[db] Available env keys:', Object.keys(process.env).filter(k => /postgres|database|prisma/i.test(k)).join(', '));
-      return null;
+    const mod = await import('@vercel/postgres');
+    const masked = dbUrl.substring(0, 30) + '...';
+
+    if (isPooledConnectionString(dbUrl)) {
+      // Pooled connection — use createPool
+      console.log('[db] Using pooled connection:', masked);
+      const pool = mod.createPool({ connectionString: dbUrl });
+      cachedSql = pool.sql.bind(pool) as SqlTag;
+    } else {
+      // Direct connection — must use createClient (NOT createPool or sql tag)
+      console.log('[db] Using direct connection (createClient):', masked);
+      const client = mod.createClient({ connectionString: dbUrl });
+      await client.connect();
+      cachedSql = client.sql.bind(client) as SqlTag;
     }
-    console.log('[db] Connecting with URL from:', dbUrl.startsWith('postgres') ? dbUrl.substring(0, 30) + '...' : 'masked');
-    const pool = createPool({ connectionString: dbUrl });
-    cachedSql = pool.sql.bind(pool);
+
     // Verify connectivity
     await cachedSql`SELECT 1`;
     console.log('[db] Database connection verified');
