@@ -1,42 +1,24 @@
 import { ensureDatabaseEnv } from './db-env';
+import { sql as vercelSql } from '@vercel/postgres';
 
 type SqlTag = (strings: TemplateStringsArray, ...values: any[]) => Promise<any>;
 
-let cachedSql: SqlTag | null | undefined;
-
-function hasPooledConnectionString(url?: string) {
-  if (!url) return false;
-  const lowered = url.toLowerCase();
-  if (lowered.startsWith('prisma+postgres://')) return true;  // Prisma Accelerate IS pooled
-  if (lowered.includes('db.prisma.io')) return false;
-  if (lowered.includes('neon.tech') && lowered.includes('pooler')) return true;
-  if (lowered.includes('pooler')) return true;
-  if (lowered.includes('pgbouncer=true')) return true;
-  return false;
-}
-
-export function hasPooledDatabase() {
-  ensureDatabaseEnv();
-  const url = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
-  return hasPooledConnectionString(url);
-}
+let cachedSql: SqlTag | null = null;
 
 export async function getSql(): Promise<SqlTag | null> {
-  if (cachedSql !== undefined) return cachedSql;
+  if (cachedSql !== null) return cachedSql;
   try {
     ensureDatabaseEnv();
     const dbUrl = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL;
     if (!dbUrl) {
-      console.error('No database URL found in env vars');
-      cachedSql = null;
-      return cachedSql;
+      console.error('No database URL found. Checked POSTGRES_PRISMA_URL, POSTGRES_URL, DATABASE_URL');
+      return null;
     }
-    const mod = await import('@vercel/postgres');
-    cachedSql = mod.sql as SqlTag;
+    // Use @vercel/postgres which handles the connection pooling
+    cachedSql = vercelSql;
     return cachedSql;
   } catch (err) {
-    console.error('Database connection error:', err);
-    cachedSql = null;
-    return cachedSql;
+    console.error('Database initialization error:', err);
+    return null;
   }
 }
