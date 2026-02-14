@@ -14,6 +14,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { label: 'Analytics', href: '/account/admin/analytics' },
   { label: 'Affiliate Applications', href: '/account/admin/affiliates', exact: true },
   { label: 'Approved Affiliates', href: '/account/admin/affiliates/approved' },
+  { label: 'Accounting', href: '/account/admin/accounting' },
 ];
 
 export function isActiveAdminPath(pathname: string, item: AdminNavItem) {
