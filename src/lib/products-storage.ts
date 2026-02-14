@@ -121,46 +121,24 @@ export async function updateProduct(id: string, updates: Partial<Omit<Product, '
     if (sql) {
       await ensureTables();
       
-      const setClauses: string[] = [];
-      const values: any[] = [];
+      // Build SET assignments dynamically
+      const setAssignments: any[] = [];
       
-      if (updates.slug !== undefined) {
-        setClauses.push(`slug = $${values.length + 1}`);
-        values.push(updates.slug);
-      }
-      if (updates.name !== undefined) {
-        setClauses.push(`name = $${values.length + 1}`);
-        values.push(updates.name);
-      }
-      if (updates.price !== undefined) {
-        setClauses.push(`price = $${values.length + 1}`);
-        values.push(updates.price);
-      }
-      if (updates.category !== undefined) {
-        setClauses.push(`category = $${values.length + 1}`);
-        values.push(updates.category);
-      }
-      if (updates.image !== undefined) {
-        setClauses.push(`image = $${values.length + 1}`);
-        values.push(updates.image);
-      }
-      if (updates.desc !== undefined) {
-        setClauses.push(`description = $${values.length + 1}`);
-        values.push(updates.desc);
-      }
-      if (updates.research !== undefined) {
-        setClauses.push(`research = $${values.length + 1}`);
-        values.push(updates.research);
-      }
+      if (updates.slug !== undefined) setAssignments.push(sql`slug = ${updates.slug}`);
+      if (updates.name !== undefined) setAssignments.push(sql`name = ${updates.name}`);
+      if (updates.price !== undefined) setAssignments.push(sql`price = ${updates.price}`);
+      if (updates.category !== undefined) setAssignments.push(sql`category = ${updates.category}`);
+      if (updates.image !== undefined) setAssignments.push(sql`image = ${updates.image}`);
+      if (updates.desc !== undefined) setAssignments.push(sql`description = ${updates.desc}`);
+      if (updates.research !== undefined) setAssignments.push(sql`research = ${updates.research}`);
 
-      if (setClauses.length === 0) {
+      if (setAssignments.length === 0) {
         throw new Error('No fields to update');
       }
 
-      values.push(id);
       const result = await sql`
         UPDATE products 
-        SET ${sql(setClauses.join(', '))}
+        SET ${sql.join(setAssignments, sql`, `)}
         WHERE id = ${id}
         RETURNING id, slug, name, price, category, image, description AS desc, research
       `;
