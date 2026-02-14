@@ -1,12 +1,14 @@
-import { products, type Product } from '@/app/catalog/data';
+import { type Product } from '@/app/catalog/data';
 import { getSql, hasPooledDatabase } from './db';
 import { readJson, writeJson } from './storage';
+import { listAllProducts } from './products-storage';
 
 export type ProductOverride = {
   productId: string;
   enabled: boolean;
   price: number | null;
   inventory: number | null;
+  image: string | null;
   updatedAt: string;
 };
 
@@ -36,6 +38,7 @@ async function ensureTables() {
       enabled boolean NOT NULL DEFAULT true,
       price numeric NULL,
       inventory int NULL,
+      image text NULL,
       updated_at timestamptz NOT NULL
     );
   `;
@@ -51,6 +54,7 @@ export async function listProductOverrides(): Promise<Record<string, ProductOver
                enabled,
                price,
                inventory,
+               image,
                updated_at AS "updatedAt"
         FROM product_overrides
       `;
@@ -62,6 +66,7 @@ export async function listProductOverrides(): Promise<Record<string, ProductOver
           enabled: Boolean(row.enabled),
           price: row.price === null || row.price === undefined ? null : Number(row.price),
           inventory: row.inventory === null || row.inventory === undefined ? null : Number(row.inventory),
+          image: row.image || null,
           updatedAt: new Date(row.updatedAt).toISOString(),
         };
       }
@@ -78,6 +83,7 @@ export async function upsertProductOverride(input: {
   enabled?: boolean;
   price?: number | null;
   inventory?: number | null;
+  image?: string | null;
 }): Promise<ProductOverride> {
   const productId = input.productId;
   if (!productId) throw new Error('productId is required');
@@ -89,14 +95,15 @@ export async function upsertProductOverride(input: {
     if (sql) {
       await ensureTables();
       const result = await sql`
-        INSERT INTO product_overrides (product_id, enabled, price, inventory, updated_at)
-        VALUES (${productId}, COALESCE(${input.enabled ?? null}, true), ${input.price ?? null}, ${input.inventory ?? null}, ${now})
+        INSERT INTO product_overrides (product_id, enabled, price, inventory, image, updated_at)
+        VALUES (${productId}, COALESCE(${input.enabled ?? null}, true), ${input.price ?? null}, ${input.inventory ?? null}, ${input.image ?? null}, ${now})
         ON CONFLICT (product_id) DO UPDATE
           SET enabled = COALESCE(${input.enabled ?? null}, product_overrides.enabled),
               price = COALESCE(${input.price ?? null}, product_overrides.price),
               inventory = COALESCE(${input.inventory ?? null}, product_overrides.inventory),
+              image = COALESCE(${input.image ?? null}, product_overrides.image),
               updated_at = ${now}
-        RETURNING product_id AS "productId", enabled, price, inventory, updated_at AS "updatedAt"
+        RETURNING product_id AS "productId", enabled, price, inventory, image, updated_at AS "updatedAt"
       `;
 
       const row = result.rows[0] as any;
@@ -105,6 +112,7 @@ export async function upsertProductOverride(input: {
         enabled: Boolean(row.enabled),
         price: row.price === null || row.price === undefined ? null : Number(row.price),
         inventory: row.inventory === null || row.inventory === undefined ? null : Number(row.inventory),
+        image: row.image || null,
         updatedAt: new Date(row.updatedAt).toISOString(),
       };
     }
@@ -116,6 +124,7 @@ export async function upsertProductOverride(input: {
     enabled: true,
     price: null,
     inventory: null,
+    image: null,
     updatedAt: now,
   };
 
@@ -124,6 +133,7 @@ export async function upsertProductOverride(input: {
     enabled: input.enabled ?? current.enabled,
     price: input.price !== undefined ? input.price : current.price,
     inventory: input.inventory !== undefined ? input.inventory : current.inventory,
+    image: input.image !== undefined ? input.image : current.image,
     updatedAt: now,
   };
 
@@ -134,18 +144,21 @@ export async function upsertProductOverride(input: {
 
 export async function listAdminProducts(): Promise<AdminProduct[]> {
   const overrides = await listProductOverrides();
+  const products = await listAllProducts();
 
   return products.map((p) => {
     const ov = overrides[p.id];
     const enabled = ov ? ov.enabled : true;
     const overridePrice = ov?.price ?? null;
     const inventory = ov?.inventory ?? null;
+    const overrideImage = ov?.image ?? null;
     const adminPrice = overridePrice ?? p.price;
 
     return {
       ...p,
       enabled,
       inventory,
+      image: overrideImage ?? p.image, // Use override image if set, otherwise default
       basePrice: p.price,
       overridePrice,
       adminPrice,
