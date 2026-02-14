@@ -19,7 +19,9 @@ export type AffiliateApplication = {
   status: AffiliateStatus;
   code?: string | null;
   signupCreditCents: number;
+  commissionRate: number;
   approvedAt?: string | null;
+  expiresAt?: string | null;
   declinedAt?: string | null;
   requestedInfoAt?: string | null;
   discordUserId?: string | null;
@@ -100,7 +102,9 @@ export async function ensureAffiliateTables() {
       status text NOT NULL,
       code text NULL,
       signup_credit_cents int NOT NULL DEFAULT 0,
+      commission_rate numeric NOT NULL DEFAULT 0.10,
       approved_at timestamptz NULL,
+      expires_at timestamptz NULL,
       declined_at timestamptz NULL,
       requested_info_at timestamptz NULL,
       discord_user_id text NULL,
@@ -183,7 +187,9 @@ export async function createAffiliateApplication(input: {
     status: 'pending',
     code: null,
     signupCreditCents: 0,
+    commissionRate: 0.10, // Default 10% commission
     approvedAt: null,
+    expiresAt: null,
     declinedAt: null,
     requestedInfoAt: null,
     discordUserId: null,
@@ -197,9 +203,9 @@ export async function createAffiliateApplication(input: {
     try {
       await sql`
         INSERT INTO affiliate_applications
-        (id, name, email, social_handle, audience_size, channels, notes, status, code, signup_credit_cents, approved_at, declined_at, requested_info_at, discord_user_id, created_at, updated_at)
+        (id, name, email, social_handle, audience_size, channels, notes, status, code, signup_credit_cents, commission_rate, approved_at, expires_at, declined_at, requested_info_at, discord_user_id, created_at, updated_at)
         VALUES
-        (${record.id}, ${record.name}, ${record.email}, ${record.socialHandle}, ${record.audienceSize}, ${record.channels}, ${record.notes}, ${record.status}, ${record.code}, ${record.signupCreditCents}, ${record.approvedAt}, ${record.declinedAt}, ${record.requestedInfoAt}, ${record.discordUserId}, ${record.createdAt}, ${record.updatedAt})
+        (${record.id}, ${record.name}, ${record.email}, ${record.socialHandle}, ${record.audienceSize}, ${record.channels}, ${record.notes}, ${record.status}, ${record.code}, ${record.signupCreditCents}, ${record.commissionRate}, ${record.approvedAt}, ${record.expiresAt}, ${record.declinedAt}, ${record.requestedInfoAt}, ${record.discordUserId}, ${record.createdAt}, ${record.updatedAt})
       `;
       return record;
     } catch (dbError) {
@@ -229,7 +235,9 @@ export async function listAffiliateApplications(status?: AffiliateStatus): Promi
                  status,
                  code,
                  signup_credit_cents AS "signupCreditCents",
+                 commission_rate AS "commissionRate",
                  approved_at AS "approvedAt",
+                 expires_at AS "expiresAt",
                  declined_at AS "declinedAt",
                  requested_info_at AS "requestedInfoAt",
                  discord_user_id AS "discordUserId",
@@ -250,7 +258,9 @@ export async function listAffiliateApplications(status?: AffiliateStatus): Promi
                  status,
                  code,
                  signup_credit_cents AS "signupCreditCents",
+                 commission_rate AS "commissionRate",
                  approved_at AS "approvedAt",
+                 expires_at AS "expiresAt",
                  declined_at AS "declinedAt",
                  requested_info_at AS "requestedInfoAt",
                  discord_user_id AS "discordUserId",
@@ -267,11 +277,13 @@ export async function listAffiliateApplications(status?: AffiliateStatus): Promi
   return status ? apps.filter(app => app.status === status) : apps;
 }
 
-export async function getAffiliateByCode(code: string): Promise<AffiliateApplication | null> {
+export async function getAffiliateByCode(code: string, options?: { requireActive?: boolean }): Promise<AffiliateApplication | null> {
   const normalized = formatAffiliateCode(code);
   if (!normalized) return null;
 
   const sql = await getDb();
+  let affiliate: AffiliateApplication | null = null;
+
   if (sql) {
     const rows = await sql`
       SELECT id,
@@ -284,7 +296,9 @@ export async function getAffiliateByCode(code: string): Promise<AffiliateApplica
              status,
              code,
              signup_credit_cents AS "signupCreditCents",
+             commission_rate AS "commissionRate",
              approved_at AS "approvedAt",
+             expires_at AS "expiresAt",
              declined_at AS "declinedAt",
              requested_info_at AS "requestedInfoAt",
              discord_user_id AS "discordUserId",
@@ -294,11 +308,19 @@ export async function getAffiliateByCode(code: string): Promise<AffiliateApplica
       WHERE code = ${normalized}
       LIMIT 1
     `;
-    return (rows.rows[0] as AffiliateApplication) || null;
+    affiliate = (rows.rows[0] as AffiliateApplication) || null;
+  } else {
+    const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
+    affiliate = store.applications.find((app) => app.code === normalized) || null;
   }
 
-  const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
-  return store.applications.find((app) => app.code === normalized) || null;
+  // Check if affiliate is active (approved and not expired)
+  if (options?.requireActive && affiliate) {
+    if (affiliate.status !== 'approved') return null;
+    if (affiliate.expiresAt && new Date(affiliate.expiresAt) < new Date()) return null;
+  }
+
+  return affiliate;
 }
 
 export async function updateAffiliateApplication(input: {
@@ -324,12 +346,17 @@ export async function updateAffiliateApplication(input: {
     const current = currentRows.rows[0] as { name: string; email: string; code: string | null };
     let code: string | null = null;
     let approvedAt: string | null = null;
+    let expiresAt: string | null = null;
     let declinedAt: string | null = null;
     let requestedInfoAt: string | null = null;
 
     if (desiredStatus === 'approved') {
       code = current.code || (await generateAffiliateCode(current.name, current.email));
       approvedAt = now;
+      // Set expiry to 60 days from now
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + 60);
+      expiresAt = expiry.toISOString();
     } else if (desiredStatus === 'declined') {
       declinedAt = now;
     } else if (desiredStatus === 'needs_info') {
@@ -342,6 +369,7 @@ export async function updateAffiliateApplication(input: {
           code = COALESCE(${code}, code),
           signup_credit_cents = COALESCE(${input.signupCreditCents ?? null}, signup_credit_cents),
           approved_at = COALESCE(${approvedAt}, approved_at),
+          expires_at = COALESCE(${expiresAt}, expires_at),
           declined_at = COALESCE(${declinedAt}, declined_at),
           requested_info_at = COALESCE(${requestedInfoAt}, requested_info_at),
           discord_user_id = COALESCE(${input.discordUserId ?? null}, discord_user_id),
@@ -357,7 +385,9 @@ export async function updateAffiliateApplication(input: {
                 status,
                 code,
                 signup_credit_cents AS "signupCreditCents",
+                commission_rate AS "commissionRate",
                 approved_at AS "approvedAt",
+                expires_at AS "expiresAt",
                 declined_at AS "declinedAt",
                 requested_info_at AS "requestedInfoAt",
                 discord_user_id AS "discordUserId",
@@ -368,8 +398,13 @@ export async function updateAffiliateApplication(input: {
     const updated = (result.rows[0] as AffiliateApplication) || null;
 
     if (updated && desiredStatus === 'approved') {
+      // Send email notification to the affiliate
+      await notifyAffiliateApproval(updated).catch((error) => {
+        console.error('Affiliate approval email failed', error);
+      });
+
       await sendTelegramAdminAlert(
-        `Affiliate approved: ${updated.name} (${updated.email})\nCode: ${updated.code || 'TBD'}\nSignup credit: $${(
+        `Affiliate approved: ${updated.name} (${updated.email})\nCode: ${updated.code || 'TBD'}\nExpires: ${updated.expiresAt ? new Date(updated.expiresAt).toLocaleDateString() : 'N/A'}\nSignup credit: $${(
           updated.signupCreditCents / 100
         ).toFixed(2)}`
       ).catch((error) => {
@@ -397,6 +432,13 @@ export async function updateAffiliateApplication(input: {
   const current = store.applications[idx];
   const nextStatus = desiredStatus ?? current.status;
   const code = nextStatus === 'approved' && !current.code ? await generateAffiliateCode(current.name, current.email) : current.code;
+  
+  let expiresAt = current.expiresAt;
+  if (nextStatus === 'approved' && !current.approvedAt) {
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + 60);
+    expiresAt = expiry.toISOString();
+  }
 
   const updated: AffiliateApplication = {
     ...current,
@@ -404,6 +446,7 @@ export async function updateAffiliateApplication(input: {
     code,
     signupCreditCents: input.signupCreditCents ?? current.signupCreditCents,
     approvedAt: nextStatus === 'approved' ? now : current.approvedAt,
+    expiresAt,
     declinedAt: nextStatus === 'declined' ? now : current.declinedAt,
     requestedInfoAt: nextStatus === 'needs_info' ? now : current.requestedInfoAt,
     discordUserId: input.discordUserId ?? current.discordUserId,
@@ -414,8 +457,13 @@ export async function updateAffiliateApplication(input: {
   await writeJson(STORAGE_FILE, store);
 
   if (nextStatus === 'approved') {
+    // Send email notification to the affiliate
+    await notifyAffiliateApproval(updated).catch((error) => {
+      console.error('Affiliate approval email failed', error);
+    });
+
     await sendTelegramAdminAlert(
-      `Affiliate approved: ${updated.name} (${updated.email})\nCode: ${updated.code || 'TBD'}\nSignup credit: $${(
+      `Affiliate approved: ${updated.name} (${updated.email})\nCode: ${updated.code || 'TBD'}\nExpires: ${updated.expiresAt ? new Date(updated.expiresAt).toLocaleDateString() : 'N/A'}\nSignup credit: $${(
         updated.signupCreditCents / 100
       ).toFixed(2)}`
     ).catch((error) => {
@@ -637,9 +685,10 @@ export async function notifyAffiliateApproval(application: AffiliateApplication)
 
   const port = Number(process.env.SMTP_PORT || 587);
   const secure = process.env.SMTP_SECURE === 'true';
-  const from = process.env.SMTP_FROM || process.env.ADMIN_EMAIL || user;
+  const from = process.env.AFFILIATE_EMAIL || 'affiliates@vikinglabs.co';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co';
   const signupCredit = (application.signupCreditCents / 100).toFixed(2);
+  const expiryDate = application.expiresAt ? new Date(application.expiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
 
   const transporter = nodemailer.createTransport({
     host,
@@ -652,7 +701,7 @@ export async function notifyAffiliateApproval(application: AffiliateApplication)
   const dashboardUrl = `${siteUrl}/account/affiliates`;
 
   const subject = `Welcome to Viking Labs Affiliate Program!`;
-  const text = `Congratulations ${application.name}!\n\nYour affiliate application has been approved! 🎉\n\nYour Affiliate Code: ${application.code}\nYour Referral Link: ${referralUrl}\n${application.signupCreditCents > 0 ? `Signup Credit: $${signupCredit}\n` : ''}\n\nHow It Works:\n1. Share your referral link with your audience\n2. When someone clicks your link and makes a purchase, you earn credit\n3. Track your performance at: ${dashboardUrl}\n\nYour referral link is: ${referralUrl}\n\nShare this link on your social media, in your content, or anywhere your audience hangs out. Every purchase made through your link will be attributed to you.\n\nView your affiliate dashboard to track:\n- Click stats\n- Sales attributed to you\n- Revenue earned\n\nThank you for partnering with Viking Labs!\n\nBest regards,\nViking Labs Team`;
+  const text = `Congratulations ${application.name}!\n\nYour affiliate application has been approved! 🎉\n\nYour Affiliate Code: ${application.code}\nValid Until: ${expiryDate}\nYour Referral Link: ${referralUrl}\n${application.signupCreditCents > 0 ? `Signup Credit: $${signupCredit}\n` : ''}\nCommission Rate: ${(application.commissionRate * 100).toFixed(0)}%\n\nHow It Works:\n1. Share your referral link with your audience\n2. When someone clicks your link and makes a purchase, you earn ${(application.commissionRate * 100).toFixed(0)}% commission\n3. Track your performance at: ${dashboardUrl}\n\nYour referral link is: ${referralUrl}\n\nShare this link on your social media, in your content, or anywhere your audience hangs out. Every purchase made through your link will be attributed to you.\n\nView your affiliate dashboard to track:\n- Click stats\n- Sales attributed to you\n- Revenue earned\n- Commission accumulated\n\nNote: Your affiliate code expires on ${expiryDate}. Contact us if you'd like to renew.\n\nThank you for partnering with Viking Labs!\n\nBest regards,\nViking Labs Affiliate Team`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -664,6 +713,12 @@ export async function notifyAffiliateApproval(application: AffiliateApplication)
       <div style="background: #f8fafc; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0;">
         <p style="margin: 0; font-size: 14px; color: #64748b;">Your Affiliate Code</p>
         <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #1e293b;">${application.code}</p>
+        <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">Valid until: ${expiryDate}</p>
+      </div>
+      
+      <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 16px; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #1e40af;">Commission Rate</p>
+        <p style="margin: 8px 0 0 0; font-size: 20px; font-weight: bold; color: #1e40af;">${(application.commissionRate * 100).toFixed(0)}%</p>
       </div>
       
       ${application.signupCreditCents > 0 ? `
@@ -676,8 +731,9 @@ export async function notifyAffiliateApproval(application: AffiliateApplication)
       <h3 style="color: #1e293b; margin-top: 32px;">How It Works:</h3>
       <ol style="color: #475569; line-height: 1.8;">
         <li>Share your referral link with your audience</li>
-        <li>When someone clicks your link and makes a purchase, you earn credit</li>
+        <li>When someone clicks your link and makes a purchase, you earn ${(application.commissionRate * 100).toFixed(0)}% commission</li>
         <li>Track your performance in real-time</li>
+        <li>Withdraw your earnings once you reach the minimum threshold</li>
       </ol>
       
       <div style="margin: 32px 0;">
@@ -695,7 +751,13 @@ export async function notifyAffiliateApproval(application: AffiliateApplication)
       
       <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin-top: 32px;">
         <p style="margin: 0; font-size: 14px; color: #64748b;">
-          <strong>Track Everything:</strong> Click stats, sales, revenue earned, and more in your affiliate dashboard.
+          <strong>Track Everything:</strong> Click stats, sales, revenue earned, commission accumulated, and more in your affiliate dashboard.
+        </p>
+      </div>
+      
+      <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid #fecaca;">
+        <p style="margin: 0; font-size: 12px; color: #991b1b;">
+          ⏰ <strong>Important:</strong> Your affiliate code expires on ${expiryDate}. Contact us before expiration to discuss renewal.
         </p>
       </div>
       
@@ -705,7 +767,7 @@ export async function notifyAffiliateApproval(application: AffiliateApplication)
       
       <p style="color: #64748b; font-size: 14px; margin-top: 24px;">
         Best regards,<br>
-        <strong>Viking Labs Team</strong>
+        <strong>Viking Labs Affiliate Team</strong>
       </p>
     </div>
   `;

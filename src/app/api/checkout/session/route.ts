@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     const mode: 'payment' | 'subscription' = hasAutoship ? 'subscription' : 'payment';
 
     const affiliateCode = req.cookies.get(AFFILIATE_COOKIE_NAME)?.value;
-    const affiliate = affiliateCode ? await getAffiliateByCode(affiliateCode) : null;
+    const affiliate = affiliateCode ? await getAffiliateByCode(affiliateCode, { requireActive: true }) : null;
 
     const lineItems = items.map((item) => {
       const base: {
