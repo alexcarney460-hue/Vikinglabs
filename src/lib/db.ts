@@ -24,10 +24,18 @@ export function hasPooledDatabase() {
 export async function getSql(): Promise<SqlTag | null> {
   if (cachedSql !== undefined) return cachedSql;
   try {
+    ensureDatabaseEnv();
+    const dbUrl = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL;
+    if (!dbUrl) {
+      console.error('No database URL found in env vars');
+      cachedSql = null;
+      return cachedSql;
+    }
     const mod = await import('@vercel/postgres');
     cachedSql = mod.sql as SqlTag;
     return cachedSql;
   } catch (err) {
+    console.error('Database connection error:', err);
     cachedSql = null;
     return cachedSql;
   }
