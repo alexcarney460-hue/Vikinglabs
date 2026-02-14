@@ -452,14 +452,13 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                           : ''
                       }
                       onChange={(e) => {
-                        const raw = e.target.value;
+                        const raw = e.target.value.trim();
                         if (!raw) {
                           updateLocal(p.id, { overridePrice: null });
-                        } else {
+                        } else if (/^\d+(\.\d{0,2})?$/.test(raw)) {
+                          // Allow digits with optional decimal (max 2 decimal places)
                           const parsed = parseFloat(raw);
-                          if (!isNaN(parsed)) {
-                            updateLocal(p.id, { overridePrice: parsed });
-                          }
+                          updateLocal(p.id, { overridePrice: parsed });
                         }
                       }}
                       placeholder={p.basePrice.toFixed(2)}

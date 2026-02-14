@@ -51,7 +51,7 @@ export default function AffiliateForm() {
     <form className="space-y-5" onSubmit={handleSubmit}>
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-slate-700">Full Name</label>
+          <label className="text-sm font-bold text-slate-700">Full Name <span className="text-red-500">*</span></label>
           <input
             type="text"
             value={form.name}
@@ -61,7 +61,7 @@ export default function AffiliateForm() {
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-slate-700">Email</label>
+          <label className="text-sm font-bold text-slate-700">Email <span className="text-red-500">*</span></label>
           <input
             type="email"
             value={form.email}
