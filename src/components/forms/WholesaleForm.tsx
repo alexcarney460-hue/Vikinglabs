@@ -84,20 +84,23 @@ export default function WholesaleForm() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold text-slate-700">Website / Social (Optional)</label>
+        <label className="text-sm font-bold text-slate-700">Website / Social <span className="text-red-500">*</span></label>
         <input
           type="text"
           value={form.website}
           onChange={handleChange('website')}
+          placeholder="https://..."
+          required
           className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
         />
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold text-slate-700">Estimated Monthly Volume</label>
+        <label className="text-sm font-bold text-slate-700">Estimated Monthly Volume <span className="text-red-500">*</span></label>
         <select
           value={form.volume}
           onChange={handleChange('volume')}
+          required
           className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none bg-white"
         >
           <option>$2k - $5k</option>
@@ -108,12 +111,13 @@ export default function WholesaleForm() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold text-slate-700">Additional Details</label>
+        <label className="text-sm font-bold text-slate-700">Additional Details <span className="text-red-500">*</span></label>
         <textarea
           rows={3}
           value={form.details}
           onChange={handleChange('details')}
           placeholder="Tell us about your needs..."
+          required
           className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
         ></textarea>
       </div>

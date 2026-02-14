@@ -73,46 +73,50 @@ export default function AffiliateForm() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold text-slate-700">Primary Handle / URL</label>
+        <label className="text-sm font-bold text-slate-700">Primary Handle / URL <span className="text-red-500">*</span></label>
         <input
           type="text"
           value={form.socialHandle}
           onChange={handleChange('socialHandle')}
           placeholder="@username or https://..."
+          required
           className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
         />
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-slate-700">Audience Size</label>
+          <label className="text-sm font-bold text-slate-700">Audience Size <span className="text-red-500">*</span></label>
           <input
             type="text"
             value={form.audienceSize}
             onChange={handleChange('audienceSize')}
             placeholder="e.g. 50k subscribers"
+            required
             className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-slate-700">Primary Channels</label>
+          <label className="text-sm font-bold text-slate-700">Primary Channels <span className="text-red-500">*</span></label>
           <input
             type="text"
             value={form.channels}
             onChange={handleChange('channels')}
             placeholder="YouTube, TikTok, Email List, etc."
+            required
             className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold text-slate-700">Notes / Pitch</label>
+        <label className="text-sm font-bold text-slate-700">Notes / Pitch <span className="text-red-500">*</span></label>
         <textarea
           rows={4}
           value={form.notes}
           onChange={handleChange('notes')}
           placeholder="Tell us about your audience and content style."
+          required
           className="w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
         ></textarea>
       </div>
