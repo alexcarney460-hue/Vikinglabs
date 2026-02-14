@@ -7,7 +7,8 @@ let cachedSql: SqlTag | null = null;
 
 function getConnectionUrl(): string | undefined {
   ensureDatabaseEnv();
-  return process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL;
+  // Prioritize pooled connection (Prisma Accelerate) over direct connections
+  return process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL;
 }
 
 export function hasPooledDatabase() {
