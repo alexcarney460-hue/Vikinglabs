@@ -23,11 +23,12 @@ export function hasPooledDatabase() {
 
 export async function getSql(): Promise<SqlTag | null> {
   if (cachedSql !== undefined) return cachedSql;
-  if (!hasPooledDatabase()) {
+  try {
+    const mod = await import('@vercel/postgres');
+    cachedSql = mod.sql as SqlTag;
+    return cachedSql;
+  } catch (err) {
     cachedSql = null;
     return cachedSql;
   }
-  const mod = await import('@vercel/postgres');
-  cachedSql = mod.sql as SqlTag;
-  return cachedSql;
 }
