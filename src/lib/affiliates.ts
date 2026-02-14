@@ -621,6 +621,104 @@ export async function exportAffiliatePayoutsCsv(options?: { start?: string; end?
   });
 }
 
+export async function notifyAffiliateApproval(application: AffiliateApplication) {
+  if (!application.email || !application.code) {
+    console.warn('Affiliate approval notification skipped: Missing email or code.');
+    return;
+  }
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) {
+    console.warn('Affiliate approval notification skipped: SMTP credentials not configured.');
+    return;
+  }
+
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === 'true';
+  const from = process.env.SMTP_FROM || process.env.ADMIN_EMAIL || user;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co';
+  const signupCredit = (application.signupCreditCents / 100).toFixed(2);
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
+
+  const referralUrl = `${siteUrl}/r/${application.code}`;
+  const dashboardUrl = `${siteUrl}/account/affiliates`;
+
+  const subject = `Welcome to Viking Labs Affiliate Program!`;
+  const text = `Congratulations ${application.name}!\n\nYour affiliate application has been approved! 🎉\n\nYour Affiliate Code: ${application.code}\nYour Referral Link: ${referralUrl}\n${application.signupCreditCents > 0 ? `Signup Credit: $${signupCredit}\n` : ''}\n\nHow It Works:\n1. Share your referral link with your audience\n2. When someone clicks your link and makes a purchase, you earn credit\n3. Track your performance at: ${dashboardUrl}\n\nYour referral link is: ${referralUrl}\n\nShare this link on your social media, in your content, or anywhere your audience hangs out. Every purchase made through your link will be attributed to you.\n\nView your affiliate dashboard to track:\n- Click stats\n- Sales attributed to you\n- Revenue earned\n\nThank you for partnering with Viking Labs!\n\nBest regards,\nViking Labs Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #1e293b;">Congratulations ${application.name}! 🎉</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6;">
+        Your affiliate application has been <strong>approved</strong>!
+      </p>
+      
+      <div style="background: #f8fafc; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b;">Your Affiliate Code</p>
+        <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #1e293b;">${application.code}</p>
+      </div>
+      
+      ${application.signupCreditCents > 0 ? `
+      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #92400e;">Signup Credit</p>
+        <p style="margin: 8px 0 0 0; font-size: 20px; font-weight: bold; color: #92400e;">$${signupCredit}</p>
+      </div>
+      ` : ''}
+      
+      <h3 style="color: #1e293b; margin-top: 32px;">How It Works:</h3>
+      <ol style="color: #475569; line-height: 1.8;">
+        <li>Share your referral link with your audience</li>
+        <li>When someone clicks your link and makes a purchase, you earn credit</li>
+        <li>Track your performance in real-time</li>
+      </ol>
+      
+      <div style="margin: 32px 0;">
+        <p style="color: #64748b; font-size: 14px; margin-bottom: 8px;">Your Referral Link:</p>
+        <a href="${referralUrl}" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+          ${referralUrl}
+        </a>
+      </div>
+      
+      <div style="margin: 32px 0;">
+        <a href="${dashboardUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+          View Your Dashboard
+        </a>
+      </div>
+      
+      <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin-top: 32px;">
+        <p style="margin: 0; font-size: 14px; color: #64748b;">
+          <strong>Track Everything:</strong> Click stats, sales, revenue earned, and more in your affiliate dashboard.
+        </p>
+      </div>
+      
+      <p style="color: #475569; margin-top: 32px; line-height: 1.6;">
+        Thank you for partnering with Viking Labs!
+      </p>
+      
+      <p style="color: #64748b; font-size: 14px; margin-top: 24px;">
+        Best regards,<br>
+        <strong>Viking Labs Team</strong>
+      </p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    to: application.email,
+    from,
+    subject,
+    text,
+    html,
+  });
+}
+
 export async function notifyAffiliateAdmin(application: AffiliateApplication) {
   const adminEmail = (process.env.AFFILIATE_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim();
   if (!adminEmail) {

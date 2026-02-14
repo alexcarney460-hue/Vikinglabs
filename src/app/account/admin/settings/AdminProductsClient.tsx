@@ -21,6 +21,7 @@ type EditedProduct = {
   enabled?: boolean;
   overridePrice?: number | null;
   inventory?: number | null;
+  image?: string | null;
 };
 
 type Props = {
@@ -32,6 +33,7 @@ export default function AdminProductsClient({ initialProducts }: Props) {
   const [edited, setEdited] = useState<Map<string, EditedProduct>>(new Map());
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null);
 
   const sorted = useMemo(() => {
     return [...products].sort((a, b) => a.name.localeCompare(b.name));
@@ -39,13 +41,38 @@ export default function AdminProductsClient({ initialProducts }: Props) {
 
   const hasChanges = edited.size > 0;
 
-  function updateLocal(productId: string, patch: Partial<Pick<AdminProduct, 'enabled' | 'overridePrice' | 'inventory'>>) {
+  function updateLocal(productId: string, patch: Partial<Pick<AdminProduct, 'enabled' | 'overridePrice' | 'inventory'>> & { image?: string | null }) {
     const existing = edited.get(productId) || { id: productId };
     const updated = { ...existing, ...patch };
     const newEdited = new Map(edited);
     newEdited.set(productId, updated);
     setEdited(newEdited);
     setStatus('idle');
+  }
+
+  async function handleImageUpload(productId: string, file: File) {
+    setUploadingImage(productId);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('productId', productId);
+
+      const res = await fetch('/api/admin/products/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed');
+
+      updateLocal(productId, { image: data.url });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      setUploadingImage(null);
+    }
   }
 
   async function saveChanges() {
@@ -60,6 +87,7 @@ export default function AdminProductsClient({ initialProducts }: Props) {
         enabled: edit.enabled,
         overridePrice: edit.overridePrice,
         inventory: edit.inventory,
+        image: edit.image,
       }));
 
       const res = await fetch('/api/admin/products', {
@@ -80,6 +108,7 @@ export default function AdminProductsClient({ initialProducts }: Props) {
           enabled: edit.enabled !== undefined ? edit.enabled : p.enabled,
           overridePrice: edit.overridePrice !== undefined ? edit.overridePrice : p.overridePrice,
           inventory: edit.inventory !== undefined ? edit.inventory : p.inventory,
+          image: edit.image !== undefined ? edit.image || p.image : p.image,
           updatedAt: new Date().toISOString(),
         };
       });
@@ -159,26 +188,39 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   : 'border-slate-200 bg-white'
               }`}
             >
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="font-black text-slate-900">
-                    {p.name}
-                    {hasProductChanges(p.id) && <span className="ml-2 text-xs font-bold text-amber-600">● UNSAVED</span>}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">ID: {p.id} · /catalog/{p.slug} · {p.category}</div>
-                  <div className="mt-2 text-sm text-slate-600">
-                    Base: ${p.basePrice.toFixed(2)}{' '}
-                    {getDisplayValue(p, 'overridePrice') !== null ? (
-                      <span className="font-bold text-emerald-700">
-                        → Override: ${Number(getDisplayValue(p, 'overridePrice')).toFixed(2)}
-                      </span>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="flex gap-4">
+                  <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                    {(getDisplayValue(p, 'image') as string || p.image) ? (
+                      <img
+                        src={getDisplayValue(p, 'image') as string || p.image}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
-                      <span className="text-slate-500">(no override)</span>
+                      <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">No image</div>
                     )}
+                  </div>
+                  <div>
+                    <div className="font-black text-slate-900">
+                      {p.name}
+                      {hasProductChanges(p.id) && <span className="ml-2 text-xs font-bold text-amber-600">● UNSAVED</span>}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">ID: {p.id} · /catalog/{p.slug} · {p.category}</div>
+                    <div className="mt-2 text-sm text-slate-600">
+                      Base: ${p.basePrice.toFixed(2)}{' '}
+                      {getDisplayValue(p, 'overridePrice') !== null ? (
+                        <span className="font-bold text-emerald-700">
+                          → Override: ${Number(getDisplayValue(p, 'overridePrice')).toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">(no override)</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid gap-2 md:grid-cols-3 md:items-end">
+                <div className="grid gap-2 md:grid-cols-4 md:items-end">
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Enabled
                     <input
@@ -227,6 +269,25 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                       }}
                       placeholder="e.g. 25"
                     />
+                  </label>
+
+                  <label className="grid gap-1 text-xs font-bold text-slate-600">
+                    Product Image
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-semibold hover:file:bg-slate-200"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleImageUpload(p.id, file);
+                        }
+                      }}
+                      disabled={uploadingImage === p.id}
+                    />
+                    {uploadingImage === p.id && (
+                      <span className="text-xs text-amber-600">Uploading...</span>
+                    )}
                   </label>
                 </div>
               </div>

@@ -33,12 +33,14 @@ export async function PATCH(req: NextRequest) {
       const enabled = update.enabled;
       const price = update.price ?? update.overridePrice;
       const inventory = update.inventory;
+      const image = update.image;
 
       const updated = await upsertProductOverride({
         productId,
         enabled: typeof enabled === 'boolean' ? enabled : undefined,
         price: price === null || price === undefined || price === '' ? null : Number(price),
         inventory: inventory === null || inventory === undefined || inventory === '' ? null : Number(inventory),
+        image: image !== undefined ? image : undefined,
       });
 
       results.push(updated);
