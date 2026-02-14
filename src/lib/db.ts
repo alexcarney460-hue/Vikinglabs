@@ -5,6 +5,12 @@ type SqlTag = (strings: TemplateStringsArray, ...values: any[]) => Promise<any>;
 
 let cachedSql: SqlTag | null = null;
 
+export function hasPooledDatabase() {
+  ensureDatabaseEnv();
+  const url = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+  return !!url;
+}
+
 export async function getSql(): Promise<SqlTag | null> {
   if (cachedSql !== null) return cachedSql;
   try {
