@@ -1,0 +1,25 @@
+{
+  "views": [
+    {
+      "id": "fb5ad3b2-09c6-4a2b-a901-127d69e18b18",
+      "path": "/account/login",
+      "referrer": "http://localhost:3000/account/login",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-14T10:21:58.559Z"
+    },
+    {
+      "id": "1737923f-7e9b-42a9-b0fd-267ea5457430",
+      "path": "/account",
+      "referrer": "http://localhost:3000/account",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-14T10:21:55.798Z"
+    },
+    {
+      "id": "64de4856-acc1-43ea-adc1-214ecbbc8d34",
+      "path": "/account/admin/accounting",
+      "referrer": "http://localhost:3000/account/admin/accounting",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-14T10:21:50.940Z"
+    }
+  ]
+}
