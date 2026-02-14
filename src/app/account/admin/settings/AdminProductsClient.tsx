@@ -310,17 +310,12 @@ export default function AdminProductsClient({ initialProducts }: Props) {
               <label className="grid gap-1 text-xs font-bold text-slate-700">
                 Price <span className="text-red-500">*</span> ($)
                 <input
-                  type="text"
-                  inputMode="decimal"
+                  type="number"
+                  step="0.01"
+                  min="0"
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   value={newProduct.price}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    // Allow typing decimal numbers
-                    if (raw === '' || /^\d+(\.\d{0,2})?$/.test(raw)) {
-                      setNewProduct({ ...newProduct, price: raw });
-                    }
-                  }}
+                  onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
                   placeholder="49.99"
                   required
                 />
@@ -443,8 +438,9 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
-                      type="text"
-                      inputMode="decimal"
+                      type="number"
+                      step="0.01"
+                      min="0"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                       value={
                         getDisplayValue(p, 'overridePrice') !== null
@@ -452,13 +448,14 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                           : ''
                       }
                       onChange={(e) => {
-                        const raw = e.target.value.trim();
+                        const raw = e.target.value;
                         if (!raw) {
                           updateLocal(p.id, { overridePrice: null });
-                        } else if (/^\d+(\.\d{0,2})?$/.test(raw)) {
-                          // Allow digits with optional decimal (max 2 decimal places)
+                        } else {
                           const parsed = parseFloat(raw);
-                          updateLocal(p.id, { overridePrice: parsed });
+                          if (!isNaN(parsed) && parsed >= 0) {
+                            updateLocal(p.id, { overridePrice: parsed });
+                          }
                         }
                       }}
                       placeholder={p.basePrice.toFixed(2)}
