@@ -31,6 +31,7 @@ type Props = {
 export default function AdminProductsClient({ initialProducts }: Props) {
   const [products, setProducts] = useState<AdminProduct[]>(initialProducts);
   const [edited, setEdited] = useState<Map<string, EditedProduct>>(new Map());
+  const [priceInput, setPriceInput] = useState<Map<string, string>>(new Map());
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
@@ -310,12 +311,17 @@ export default function AdminProductsClient({ initialProducts }: Props) {
               <label className="grid gap-1 text-xs font-bold text-slate-700">
                 Price <span className="text-red-500">*</span> ($)
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   value={newProduct.price}
-                  onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    // Allow digits, decimal point
+                    if (raw === '' || /^\d+(\.\d{0,2})?$/.test(raw)) {
+                      setNewProduct({ ...newProduct, price: raw });
+                    }
+                  }}
                   placeholder="49.99"
                   required
                 />
@@ -438,17 +444,14 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={
-                        getDisplayValue(p, 'overridePrice') !== null
-                          ? Number(getDisplayValue(p, 'overridePrice')).toFixed(2)
-                          : ''
-                      }
+                      value={priceInput.get(p.id) ?? (getDisplayValue(p, 'overridePrice') !== null ? String(getDisplayValue(p, 'overridePrice')) : '')}
                       onChange={(e) => {
                         const raw = e.target.value;
+                        setPriceInput(new Map(priceInput).set(p.id, raw));
+                        
                         if (!raw) {
                           updateLocal(p.id, { overridePrice: null });
                         } else {
@@ -456,6 +459,14 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                           if (!isNaN(parsed) && parsed >= 0) {
                             updateLocal(p.id, { overridePrice: parsed });
                           }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const raw = e.target.value;
+                        if (raw && !isNaN(parseFloat(raw))) {
+                          const newInput = new Map(priceInput);
+                          newInput.delete(p.id);
+                          setPriceInput(newInput);
                         }
                       }}
                       placeholder={p.basePrice.toFixed(2)}
