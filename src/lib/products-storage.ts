@@ -121,31 +121,40 @@ export async function updateProduct(id: string, updates: Partial<Omit<Product, '
     if (sql) {
       await ensureTables();
       
-      // Build SET assignments dynamically
-      const setAssignments: any[] = [];
+      // For now, build individual UPDATE queries per field (simpler approach)
+      // @vercel/postgres doesn't support dynamic SET clauses easily
       
-      if (updates.slug !== undefined) setAssignments.push(sql`slug = ${updates.slug}`);
-      if (updates.name !== undefined) setAssignments.push(sql`name = ${updates.name}`);
-      if (updates.price !== undefined) setAssignments.push(sql`price = ${updates.price}`);
-      if (updates.category !== undefined) setAssignments.push(sql`category = ${updates.category}`);
-      if (updates.image !== undefined) setAssignments.push(sql`image = ${updates.image}`);
-      if (updates.desc !== undefined) setAssignments.push(sql`description = ${updates.desc}`);
-      if (updates.research !== undefined) setAssignments.push(sql`research = ${updates.research}`);
-
-      if (setAssignments.length === 0) {
+      if (Object.keys(updates).length === 0) {
         throw new Error('No fields to update');
       }
 
+      // Fetch current product first
+      const current = await sql`
+        SELECT id, slug, name, price, category, image, description AS desc, research
+        FROM products
+        WHERE id = ${id}
+      `;
+
+      if (current.count === 0) {
+        throw new Error('Product not found');
+      }
+
+      // Merge updates with current
+      const merged = { ...current.rows[0], ...updates };
+      
+      // Update all fields
       const result = await sql`
         UPDATE products 
-        SET ${sql.join(setAssignments, sql`, `)}
+        SET slug = ${merged.slug},
+            name = ${merged.name},
+            price = ${merged.price},
+            category = ${merged.category},
+            image = ${merged.image},
+            description = ${merged.desc},
+            research = ${merged.research}
         WHERE id = ${id}
         RETURNING id, slug, name, price, category, image, description AS desc, research
       `;
-
-      if (result.count === 0) {
-        throw new Error('Product not found');
-      }
 
       return result.rows[0] as Product;
     }
