@@ -307,11 +307,17 @@ export default function AdminProductsClient({ initialProducts }: Props) {
               <label className="grid gap-1 text-xs font-bold text-slate-700">
                 Price * ($)
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   value={newProduct.price}
-                  onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    // Allow typing decimal numbers
+                    if (raw === '' || /^\d+(\.\d{0,2})?$/.test(raw)) {
+                      setNewProduct({ ...newProduct, price: raw });
+                    }
+                  }}
                   placeholder="49.99"
                 />
               </label>
@@ -432,8 +438,8 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                       value={
                         getDisplayValue(p, 'overridePrice') !== null
@@ -445,7 +451,10 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                         if (!raw) {
                           updateLocal(p.id, { overridePrice: null });
                         } else {
-                          updateLocal(p.id, { overridePrice: Number(raw) });
+                          const parsed = parseFloat(raw);
+                          if (!isNaN(parsed)) {
+                            updateLocal(p.id, { overridePrice: parsed });
+                          }
                         }
                       }}
                       placeholder={p.basePrice.toFixed(2)}
