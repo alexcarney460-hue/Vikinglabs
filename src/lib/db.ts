@@ -7,7 +7,7 @@ let cachedSql: SqlTag | null | undefined;
 function hasPooledConnectionString(url?: string) {
   if (!url) return false;
   const lowered = url.toLowerCase();
-  if (lowered.startsWith('prisma+postgres://')) return false;
+  if (lowered.startsWith('prisma+postgres://')) return true;  // Prisma Accelerate IS pooled
   if (lowered.includes('db.prisma.io')) return false;
   if (lowered.includes('neon.tech') && lowered.includes('pooler')) return true;
   if (lowered.includes('pooler')) return true;
