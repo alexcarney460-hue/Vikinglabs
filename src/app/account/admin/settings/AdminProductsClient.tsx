@@ -272,40 +272,43 @@ export default function AdminProductsClient({ initialProducts }: Props) {
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1 text-xs font-bold text-slate-700">
-                Product ID * (lowercase, no spaces)
+                Product ID <span className="text-red-500">*</span> (lowercase, no spaces)
                 <input
                   type="text"
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   value={newProduct.id}
                   onChange={(e) => setNewProduct({ ...newProduct, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
                   placeholder="e.g. mk-677"
+                  required
                 />
               </label>
 
               <label className="grid gap-1 text-xs font-bold text-slate-700">
-                URL Slug * (lowercase, no spaces)
+                URL Slug <span className="text-red-500">*</span> (lowercase, no spaces)
                 <input
                   type="text"
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   value={newProduct.slug}
                   onChange={(e) => setNewProduct({ ...newProduct, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
                   placeholder="e.g. mk-677"
+                  required
                 />
               </label>
 
               <label className="grid gap-1 text-xs font-bold text-slate-700">
-                Product Name *
+                Product Name <span className="text-red-500">*</span>
                 <input
                   type="text"
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   value={newProduct.name}
                   onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                   placeholder="e.g. MK-677 (Ibutamoren)"
+                  required
                 />
               </label>
 
               <label className="grid gap-1 text-xs font-bold text-slate-700">
-                Price * ($)
+                Price <span className="text-red-500">*</span> ($)
                 <input
                   type="text"
                   inputMode="decimal"
@@ -319,15 +322,17 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                     }
                   }}
                   placeholder="49.99"
+                  required
                 />
               </label>
 
               <label className="grid gap-1 text-xs font-bold text-slate-700">
-                Category *
+                Category <span className="text-red-500">*</span>
                 <select
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   value={newProduct.category}
                   onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as AdminProduct['category'] })}
+                  required
                 >
                   <option value="TYPE I">TYPE I</option>
                   <option value="TYPE II">TYPE II</option>
