@@ -31,12 +31,21 @@ export async function getSql(): Promise<SqlTag | null> {
   if (cachedSql !== undefined) return cachedSql;
 
   const dbUrl = getConnectionUrl();
-  if (!dbUrl) {
-    // No direct Postgres URL — if Supabase is configured, callers should use getSupabase()
+  
+  // Skip @vercel/postgres if using Prisma Accelerate proxy (db.prisma.io) or if Supabase is configured
+  const isPrismaProxy = dbUrl && (dbUrl.includes('db.prisma.io') || dbUrl.includes('prisma+postgres://'));
+  if (!dbUrl || isPrismaProxy) {
+    // Use Supabase if available
     if (hasSupabase()) {
-      console.log('[db] No POSTGRES_URL, but Supabase is configured. Use getSupabase() for queries.');
+      console.log('[db] Using Supabase for database access');
+      cachedSql = null; // Callers should use getSupabase()
+      return null;
+    }
+    
+    if (!dbUrl) {
+      console.error('[db] No database URL found. Configure SUPABASE_URL or POSTGRES_URL');
     } else {
-      console.error('[db] No database URL found. Checked POSTGRES_URL, DATABASE_URL, SUPABASE_URL');
+      console.error('[db] Prisma Accelerate proxy detected. Use Supabase credentials instead.');
     }
     cachedSql = null;
     return null;
