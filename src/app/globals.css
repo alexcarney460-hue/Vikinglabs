@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Roboto:wght@300;400;500;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Roboto, Arial, Helvetica, sans-serif;
+}
+
+/* Great Vibes helper for logo */
+.great-vibes {
+  font-family: 'Great Vibes', cursive !important;
+}
+
+/* Viking Labs: marquee used on home USP banner */
+.vl-marquee {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+}
+
+.vl-marquee__track {
+  width: max-content;
+  display: flex;
+  will-change: transform;
+  animation: vl-marquee-left 18s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vl-marquee__track {
+    animation: none;
+  }
+}
+
+@keyframes vl-marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
