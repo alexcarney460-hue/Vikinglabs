@@ -34,6 +34,17 @@ export default function AdminProductsClient({ initialProducts }: Props) {
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    id: '',
+    slug: '',
+    name: '',
+    price: '',
+    category: 'TYPE I' as AdminProduct['category'],
+    image: '',
+    desc: '',
+    research: '',
+  });
 
   const sorted = useMemo(() => {
     return [...products].sort((a, b) => a.name.localeCompare(b.name));
@@ -72,6 +83,65 @@ export default function AdminProductsClient({ initialProducts }: Props) {
       setError(err instanceof Error ? err.message : 'Image upload failed');
     } finally {
       setUploadingImage(null);
+    }
+  }
+
+  async function handleCreateProduct() {
+    setStatus('saving');
+    setError('');
+
+    try {
+      // Validate required fields
+      if (!newProduct.id || !newProduct.slug || !newProduct.name || !newProduct.price || !newProduct.category) {
+        throw new Error('Please fill in all required fields (ID, slug, name, price, category)');
+      }
+
+      const res = await fetch('/api/admin/products/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: newProduct.id,
+          slug: newProduct.slug,
+          name: newProduct.name,
+          price: Number(newProduct.price),
+          category: newProduct.category,
+          image: newProduct.image || '/products/placeholder.png',
+          desc: newProduct.desc,
+          research: newProduct.research,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to create product');
+
+      // Add new product to local state
+      const created: AdminProduct = {
+        ...data.product,
+        enabled: true,
+        inventory: null,
+        basePrice: data.product.price,
+        overridePrice: null,
+        adminPrice: data.product.price,
+        updatedAt: null,
+      };
+
+      setProducts([...products, created]);
+      setShowCreateForm(false);
+      setNewProduct({
+        id: '',
+        slug: '',
+        name: '',
+        price: '',
+        category: 'TYPE I',
+        image: '',
+        desc: '',
+        research: '',
+      });
+      setStatus('success');
+      setTimeout(() => setStatus('idle'), 2000);
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Unable to create product');
     }
   }
 
@@ -159,24 +229,153 @@ export default function AdminProductsClient({ initialProducts }: Props) {
               Update pricing, enable/disable items, and track inventory. (Checkout currently trusts client totals; pricing here is for admin controls + future validation.)
             </p>
           </div>
-          {hasChanges && (
-            <div className="flex gap-2">
+          <div className="flex gap-2">
+            {!showCreateForm && (
               <button
-                onClick={discardChanges}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                onClick={() => setShowCreateForm(true)}
+                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
               >
-                Discard
+                + New Product
               </button>
+            )}
+            {hasChanges && (
+              <>
+                <button
+                  onClick={discardChanges}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={saveChanges}
+                  disabled={status === 'saving'}
+                  className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {status === 'saving' ? 'Saving...' : `Save Changes (${edited.size})`}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {showCreateForm && (
+          <div className="mt-6 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="text-sm font-black uppercase tracking-wide text-emerald-900">Create New Product</h4>
               <button
-                onClick={saveChanges}
-                disabled={status === 'saving'}
-                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                onClick={() => setShowCreateForm(false)}
+                className="text-sm font-semibold text-emerald-700 hover:text-emerald-900"
               >
-                {status === 'saving' ? 'Saving...' : `Save Changes (${edited.size})`}
+                Cancel
               </button>
             </div>
-          )}
-        </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-1 text-xs font-bold text-slate-700">
+                Product ID * (lowercase, no spaces)
+                <input
+                  type="text"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={newProduct.id}
+                  onChange={(e) => setNewProduct({ ...newProduct, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                  placeholder="e.g. mk-677"
+                />
+              </label>
+
+              <label className="grid gap-1 text-xs font-bold text-slate-700">
+                URL Slug * (lowercase, no spaces)
+                <input
+                  type="text"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={newProduct.slug}
+                  onChange={(e) => setNewProduct({ ...newProduct, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                  placeholder="e.g. mk-677"
+                />
+              </label>
+
+              <label className="grid gap-1 text-xs font-bold text-slate-700">
+                Product Name *
+                <input
+                  type="text"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={newProduct.name}
+                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                  placeholder="e.g. MK-677 (Ibutamoren)"
+                />
+              </label>
+
+              <label className="grid gap-1 text-xs font-bold text-slate-700">
+                Price * ($)
+                <input
+                  type="number"
+                  step="0.01"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={newProduct.price}
+                  onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                  placeholder="49.99"
+                />
+              </label>
+
+              <label className="grid gap-1 text-xs font-bold text-slate-700">
+                Category *
+                <select
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={newProduct.category}
+                  onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as AdminProduct['category'] })}
+                >
+                  <option value="TYPE I">TYPE I</option>
+                  <option value="TYPE II">TYPE II</option>
+                  <option value="TYPE III">TYPE III</option>
+                  <option value="BLEND">BLEND</option>
+                  <option value="ADVANCED">ADVANCED</option>
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-xs font-bold text-slate-700">
+                Image URL
+                <input
+                  type="text"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={newProduct.image}
+                  onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
+                  placeholder="/products/your-image.png"
+                />
+              </label>
+
+              <label className="md:col-span-2 grid gap-1 text-xs font-bold text-slate-700">
+                Description
+                <textarea
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  rows={3}
+                  value={newProduct.desc}
+                  onChange={(e) => setNewProduct({ ...newProduct, desc: e.target.value })}
+                  placeholder="Brief product description..."
+                />
+              </label>
+
+              <label className="md:col-span-2 grid gap-1 text-xs font-bold text-slate-700">
+                Research Notes
+                <textarea
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  rows={2}
+                  value={newProduct.research}
+                  onChange={(e) => setNewProduct({ ...newProduct, research: e.target.value })}
+                  placeholder="What research areas is this studied for?"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={handleCreateProduct}
+                disabled={status === 'saving'}
+                className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {status === 'saving' ? 'Creating...' : 'Create Product'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 grid gap-3">
           {sorted.map((p) => (

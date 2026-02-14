@@ -1,6 +1,7 @@
-import { products, type Product } from '@/app/catalog/data';
+import { type Product } from '@/app/catalog/data';
 import { getSql, hasPooledDatabase } from './db';
 import { readJson, writeJson } from './storage';
+import { listAllProducts } from './products-storage';
 
 export type ProductOverride = {
   productId: string;
@@ -143,6 +144,7 @@ export async function upsertProductOverride(input: {
 
 export async function listAdminProducts(): Promise<AdminProduct[]> {
   const overrides = await listProductOverrides();
+  const products = await listAllProducts();
 
   return products.map((p) => {
     const ov = overrides[p.id];

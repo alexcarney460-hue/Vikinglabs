@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { products } from './data';
+import { products as defaultProducts, type Product } from './data';
 import ProductImage from '../../components/ProductImage.jsx';
 
 const CATEGORIES = ['TYPE I', 'TYPE II', 'TYPE III', 'BLEND', 'ADVANCED'] as const;
@@ -16,6 +16,25 @@ export default function CatalogClient({ initialQ = '', initialCategory = '' }: C
   const [search, setSearch] = useState(initialQ);
   const [category, setCategory] = useState(initialCategory);
   const [sort, setSort] = useState('featured');
+  const [products, setProducts] = useState<Product[]>(defaultProducts);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        if (data.ok && data.products) {
+          setProducts(data.products);
+        }
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
 
   const filteredProducts = useMemo(() => {
     let result = products;

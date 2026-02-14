@@ -1,25 +1,56 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { products } from '../data';
+import { products as defaultProducts, type Product } from '../data';
 import { notFound } from 'next/navigation';
 import { useCart } from '../../../context/CartContext';
 import ProductImage from '../../../components/ProductImage.jsx';
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const product = products.find((p) => p.slug === slug);
+  const [products, setProducts] = useState<Product[]>(defaultProducts);
+  const [loading, setLoading] = useState(true);
   const { addItem } = useCart();
 
-  if (!product) {
-    notFound();
-  }
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        if (data.ok && data.products) {
+          setProducts(data.products);
+        }
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
+
+  const product = products.find((p) => p.slug === slug);
 
   const [selectedSize, setSelectedSize] = useState('10mL');
   const [activeTab, setActiveTab] = useState('description');
   const [isAdded, setIsAdded] = useState(false);
   const [purchasePlan, setPurchasePlan] = useState<'one-time' | 'autoship'>('one-time');
+
+  if (!loading && !product) {
+    notFound();
+  }
+
+  if (loading || !product) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-amber-500 border-r-transparent"></div>
+          <p className="mt-4 text-slate-600">Loading product...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Calculate price based on size selection
   const basePrice = selectedSize === '15mL' ? product.price + 20 : product.price;
