@@ -443,29 +443,25 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
-                      key={`price-${p.id}-${getDisplayValue(p, 'overridePrice')}`}
                       type="text"
                       inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      defaultValue={
+                      value={
                         getDisplayValue(p, 'overridePrice') !== null
                           ? String(getDisplayValue(p, 'overridePrice'))
                           : ''
                       }
-                      onBlur={(e) => {
-                        const raw = e.target.value.trim();
-                        if (!raw) {
-                          updateLocal(p.id, { overridePrice: null });
-                          e.target.value = '';
-                        } else {
-                          const parsed = parseFloat(raw);
-                          if (!isNaN(parsed) && parsed >= 0) {
-                            updateLocal(p.id, { overridePrice: parsed });
-                            e.target.value = parsed.toFixed(2);
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        // Allow intermediate typing: digits, optional decimal + 0-2 decimals OR trailing decimal
+                        if (raw === '' || /^\d+\.?\d{0,2}$/.test(raw)) {
+                          if (!raw) {
+                            updateLocal(p.id, { overridePrice: null });
                           } else {
-                            // Invalid, revert to previous value
-                            const prev = getDisplayValue(p, 'overridePrice');
-                            e.target.value = prev !== null ? String(prev) : '';
+                            const parsed = parseFloat(raw);
+                            if (!isNaN(parsed) && parsed >= 0) {
+                              updateLocal(p.id, { overridePrice: parsed });
+                            }
                           }
                         }
                       }}
@@ -476,27 +472,16 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Inventory (nullable)
                     <input
-                      key={`inventory-${p.id}-${getDisplayValue(p, 'inventory')}`}
                       type="text"
                       inputMode="numeric"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      defaultValue={
-                        getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''
-                      }
-                      onBlur={(e) => {
-                        const raw = e.target.value.trim();
+                      value={getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
                         if (!raw) {
                           updateLocal(p.id, { inventory: null });
-                          e.target.value = '';
-                        } else {
-                          const parsed = parseInt(raw, 10);
-                          if (!isNaN(parsed) && parsed >= 0) {
-                            updateLocal(p.id, { inventory: parsed });
-                            e.target.value = String(parsed);
-                          } else {
-                            const prev = getDisplayValue(p, 'inventory');
-                            e.target.value = prev !== null ? String(prev) : '';
-                          }
+                        } else if (/^\d+$/.test(raw)) {
+                          updateLocal(p.id, { inventory: Number(raw) });
                         }
                       }}
                       placeholder="e.g. 25"
