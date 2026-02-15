@@ -453,32 +453,19 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                       }
                       onChange={(e) => {
                         const raw = e.target.value;
-                        console.log('[Price Override] Raw input:', raw);
-                        
-                        // Accept any characters for display (let user type freely)
+                        // Only allow digits and single decimal point
                         if (raw === '' || /^[\d.]*$/.test(raw)) {
-                          console.log('[Price Override] Character check passed:', raw);
-                          
-                          // Only update state if it's a valid price
+                          // Clear if empty
                           if (raw === '') {
-                            console.log('[Price Override] Clearing price');
                             updateLocal(p.id, { overridePrice: null });
-                          } else if (/^\d+(\.\d{0,2})?$/.test(raw)) {
+                          } else {
+                            // Try to parse as float
                             const parsed = parseFloat(raw);
-                            console.log('[Price Override] Valid price entered:', raw, '→ parsed:', parsed);
-                            if (!isNaN(parsed) && parsed >= 0) {
+                            if (!isNaN(parsed) && parsed >= 0 && raw !== '.') {
                               updateLocal(p.id, { overridePrice: parsed });
                             }
-                          } else {
-                            console.log('[Price Override] Invalid format (incomplete):', raw);
                           }
-                        } else {
-                          console.log('[Price Override] Non-numeric char rejected');
                         }
-                      }}
-                      onBlur={(e) => {
-                        const raw = e.target.value.trim();
-                        console.log('[Price Override] Blur - formatting:', raw);
                       }}
                       placeholder={p.basePrice.toFixed(2)}
                     />
