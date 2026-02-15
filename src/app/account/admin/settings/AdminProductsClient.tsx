@@ -29,6 +29,135 @@ type Props = {
   initialProducts: AdminProduct[];
 };
 
+function ProductCard({ product, edited, updateLocal, uploadingImage, handleImageUpload, getDisplayValue, hasProductChanges }: any) {
+  const p = product;
+  return (
+    <div
+      key={p.id}
+      className={`rounded-xl border p-4 transition-colors ${
+        hasProductChanges(p.id)
+          ? 'border-amber-300 bg-amber-50'
+          : 'border-slate-200 bg-white'
+      }`}
+    >
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex gap-4">
+          <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            {(getDisplayValue(p, 'image') as string || p.image) ? (
+              <img
+                src={getDisplayValue(p, 'image') as string || p.image}
+                alt={p.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">No image</div>
+            )}
+          </div>
+          <div>
+            <div className="font-black text-slate-900">
+              {p.name}
+              {hasProductChanges(p.id) && <span className="ml-2 text-xs font-bold text-amber-600">● UNSAVED</span>}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">ID: {p.id} · /catalog/{p.slug} · {p.category}</div>
+            <div className="mt-2 text-sm text-slate-600">
+              Base: ${p.basePrice.toFixed(2)}{' '}
+              {getDisplayValue(p, 'overridePrice') !== null ? (
+                <span className="font-bold text-emerald-700">
+                  → Override: ${Number(getDisplayValue(p, 'overridePrice')).toFixed(2)}
+                </span>
+              ) : (
+                <span className="text-slate-500">(no override)</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-4 md:items-end">
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            Enabled
+            <input
+              type="checkbox"
+              defaultChecked={Boolean(getDisplayValue(p, 'enabled') ?? p.enabled)}
+              onChange={(e) => updateLocal(p.id, { enabled: e.target.checked })}
+            />
+          </label>
+
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            Price override ($)
+            <input
+              type="text"
+              inputMode="decimal"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              defaultValue={
+                getDisplayValue(p, 'overridePrice') !== null
+                  ? String(getDisplayValue(p, 'overridePrice'))
+                  : ''
+              }
+              onInput={(e) => {
+                const raw = (e.target as HTMLInputElement).value;
+                if (raw === '' || /^[\d.]*$/.test(raw)) {
+                  if (raw === '') {
+                    updateLocal(p.id, { overridePrice: null });
+                  } else if (/^\d+(\.\d{1,2})?$/.test(raw)) {
+                    const parsed = parseFloat(raw);
+                    if (!isNaN(parsed) && parsed >= 0) {
+                      updateLocal(p.id, { overridePrice: parsed });
+                    }
+                  }
+                }
+              }}
+              placeholder={p.basePrice.toFixed(2)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            Inventory (nullable)
+            <input
+              type="text"
+              inputMode="numeric"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              defaultValue={getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''}
+              onInput={(e) => {
+                const raw = (e.target as HTMLInputElement).value;
+                if (!raw) {
+                  updateLocal(p.id, { inventory: null });
+                } else if (/^\d+$/.test(raw)) {
+                  updateLocal(p.id, { inventory: Number(raw) });
+                }
+              }}
+              placeholder="e.g. 25"
+            />
+          </label>
+
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            Product Image
+            <input
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-semibold hover:file:bg-slate-200"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  handleImageUpload(p.id, file);
+                }
+              }}
+              disabled={uploadingImage === p.id}
+            />
+            {uploadingImage === p.id && (
+              <span className="text-xs text-amber-600">Uploading...</span>
+            )}
+          </label>
+        </div>
+      </div>
+
+      <div className="mt-3 text-xs text-slate-500">
+        Last updated: {p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '—'} · Status:{' '}
+        {Boolean(getDisplayValue(p, 'enabled') ?? p.enabled) ? 'Enabled' : 'Disabled'}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminProductsClient({ initialProducts }: Props) {
   const [products, setProducts] = useState<AdminProduct[]>(initialProducts);
   const [edited, setEdited] = useState<Map<string, EditedProduct>>(new Map());
@@ -391,134 +520,16 @@ export default function AdminProductsClient({ initialProducts }: Props) {
 
         <div className="mt-6 grid gap-3">
           {sorted.map((p) => (
-            <div
+            <ProductCard
               key={p.id}
-              className={`rounded-xl border p-4 transition-colors ${
-                hasProductChanges(p.id)
-                  ? 'border-amber-300 bg-amber-50'
-                  : 'border-slate-200 bg-white'
-              }`}
-            >
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="flex gap-4">
-                  <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                    {(getDisplayValue(p, 'image') as string || p.image) ? (
-                      <img
-                        src={getDisplayValue(p, 'image') as string || p.image}
-                        alt={p.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">No image</div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-black text-slate-900">
-                      {p.name}
-                      {hasProductChanges(p.id) && <span className="ml-2 text-xs font-bold text-amber-600">● UNSAVED</span>}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">ID: {p.id} · /catalog/{p.slug} · {p.category}</div>
-                    <div className="mt-2 text-sm text-slate-600">
-                      Base: ${p.basePrice.toFixed(2)}{' '}
-                      {getDisplayValue(p, 'overridePrice') !== null ? (
-                        <span className="font-bold text-emerald-700">
-                          → Override: ${Number(getDisplayValue(p, 'overridePrice')).toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">(no override)</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 md:grid-cols-4 md:items-end">
-                  <label className="grid gap-1 text-xs font-bold text-slate-600">
-                    Enabled
-                    <input
-                      key={`enabled-${p.id}`}
-                      type="checkbox"
-                      defaultChecked={Boolean(getDisplayValue(p, 'enabled') ?? p.enabled)}
-                      onChange={(e) => updateLocal(p.id, { enabled: e.target.checked })}
-                    />
-                  </label>
-
-                  <label className="grid gap-1 text-xs font-bold text-slate-600">
-                    Price override ($)
-                    <input
-                      key={`price-${p.id}`}
-                      type="text"
-                      inputMode="decimal"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      defaultValue={
-                        getDisplayValue(p, 'overridePrice') !== null
-                          ? String(getDisplayValue(p, 'overridePrice'))
-                          : ''
-                      }
-                      onInput={(e) => {
-                        const raw = (e.target as HTMLInputElement).value;
-                        // Accept any digits/dots for live display
-                        if (raw === '' || /^[\d.]*$/.test(raw)) {
-                          // Only update state if complete number
-                          if (raw === '') {
-                            updateLocal(p.id, { overridePrice: null });
-                          } else if (/^\d+(\.\d{1,2})?$/.test(raw)) {
-                            const parsed = parseFloat(raw);
-                            if (!isNaN(parsed) && parsed >= 0) {
-                              updateLocal(p.id, { overridePrice: parsed });
-                            }
-                          }
-                        }
-                      }}
-                      placeholder={p.basePrice.toFixed(2)}
-                    />
-                  </label>
-
-                  <label className="grid gap-1 text-xs font-bold text-slate-600">
-                    Inventory (nullable)
-                    <input
-                      key={`inventory-${p.id}`}
-                      type="text"
-                      inputMode="numeric"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      defaultValue={getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''}
-                      onInput={(e) => {
-                        const raw = (e.target as HTMLInputElement).value;
-                        if (!raw) {
-                          updateLocal(p.id, { inventory: null });
-                        } else if (/^\d+$/.test(raw)) {
-                          updateLocal(p.id, { inventory: Number(raw) });
-                        }
-                      }}
-                      placeholder="e.g. 25"
-                    />
-                  </label>
-
-                  <label className="grid gap-1 text-xs font-bold text-slate-600">
-                    Product Image
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-semibold hover:file:bg-slate-200"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleImageUpload(p.id, file);
-                        }
-                      }}
-                      disabled={uploadingImage === p.id}
-                    />
-                    {uploadingImage === p.id && (
-                      <span className="text-xs text-amber-600">Uploading...</span>
-                    )}
-                  </label>
-                </div>
-              </div>
-
-              <div className="mt-3 text-xs text-slate-500">
-                Last updated: {p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '—'} · Status:{' '}
-                {Boolean(getDisplayValue(p, 'enabled') ?? p.enabled) ? 'Enabled' : 'Disabled'}
-              </div>
-            </div>
+              product={p}
+              edited={edited}
+              updateLocal={updateLocal}
+              uploadingImage={uploadingImage}
+              handleImageUpload={handleImageUpload}
+              getDisplayValue={getDisplayValue}
+              hasProductChanges={hasProductChanges}
+            />
           ))}
         </div>
       </div>
