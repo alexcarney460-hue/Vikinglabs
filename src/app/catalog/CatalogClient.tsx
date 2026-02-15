@@ -64,7 +64,7 @@ export default function CatalogClient({ initialQ = '', initialCategory = '' }: C
     }
 
     return result;
-  }, [search, category, sort]);
+  }, [search, category, sort, products]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">

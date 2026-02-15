@@ -1,12 +1,35 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ProductImage from './ProductImage.jsx';
-import { products } from '../app/catalog/data';
+import { products as defaultProducts, type Product } from '../app/catalog/data';
 
 interface ProductGridProps {
   limit?: number;
 }
 
 export default function ProductGrid({ limit = 9 }: ProductGridProps) {
+  const [products, setProducts] = useState<Product[]>(defaultProducts);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        if (data.ok && data.products) {
+          setProducts(data.products);
+        }
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
+
   const gridItems = products.slice(0, limit);
 
   return (
