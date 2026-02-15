@@ -1,8 +1,13 @@
 import { listAdminProducts } from '@/lib/products-admin';
 import AdminProductsClient from './AdminProductsClient';
 
+export const revalidate = 0; // No caching - always fetch fresh data
+export const dynamic = 'force-dynamic'; // Force dynamic rendering
+
 export default async function AdminSettingsPage() {
+  console.log('[AdminSettingsPage] Loading products...');
   const products = await listAdminProducts();
+  console.log('[AdminSettingsPage] Loaded', products.length, 'products');
 
   return (
     <div>

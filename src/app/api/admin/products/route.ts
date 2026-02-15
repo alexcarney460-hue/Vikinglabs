@@ -6,7 +6,9 @@ export async function GET() {
   const guard = await requireAdmin();
   if (!guard.ok) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: guard.status });
 
+  console.log('[GET] Fetching products...');
   const products = await listAdminProducts();
+  console.log('[GET] Returning products:', products.slice(0, 2)); // Log first 2 products
   return NextResponse.json({ ok: true, products });
 }
 
