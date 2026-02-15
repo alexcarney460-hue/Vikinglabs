@@ -446,21 +446,22 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                       type="text"
                       inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      defaultValue={
+                      value={
                         getDisplayValue(p, 'overridePrice') !== null
                           ? String(getDisplayValue(p, 'overridePrice'))
                           : ''
                       }
-                      onBlur={(e) => {
-                        const raw = e.target.value.trim();
-                        if (!raw) {
-                          updateLocal(p.id, { overridePrice: null });
-                          e.target.value = '';
-                        } else {
-                          const parsed = parseFloat(raw);
-                          if (!isNaN(parsed) && parsed >= 0) {
-                            updateLocal(p.id, { overridePrice: parsed });
-                            e.target.value = parsed.toFixed(2);
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        // Allow digits, decimal point (0-2 decimals)
+                        if (raw === '' || /^\d+(\.\d{0,2})?$/.test(raw)) {
+                          if (!raw) {
+                            updateLocal(p.id, { overridePrice: null });
+                          } else {
+                            const parsed = parseFloat(raw);
+                            if (!isNaN(parsed) && parsed >= 0) {
+                              updateLocal(p.id, { overridePrice: parsed });
+                            }
                           }
                         }
                       }}
