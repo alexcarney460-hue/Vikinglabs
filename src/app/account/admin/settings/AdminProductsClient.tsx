@@ -443,25 +443,23 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
-                      type="text"
-                      inputMode="decimal"
+                      type="number"
+                      step="0.01"
+                      min="0"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                       value={
                         getDisplayValue(p, 'overridePrice') !== null
-                          ? String(getDisplayValue(p, 'overridePrice'))
+                          ? getDisplayValue(p, 'overridePrice')
                           : ''
                       }
                       onChange={(e) => {
                         const raw = e.target.value;
-                        // Allow digits, decimal point (0-2 decimals)
-                        if (raw === '' || /^\d+(\.\d{0,2})?$/.test(raw)) {
-                          if (!raw) {
-                            updateLocal(p.id, { overridePrice: null });
-                          } else {
-                            const parsed = parseFloat(raw);
-                            if (!isNaN(parsed) && parsed >= 0) {
-                              updateLocal(p.id, { overridePrice: parsed });
-                            }
+                        if (!raw) {
+                          updateLocal(p.id, { overridePrice: null });
+                        } else {
+                          const parsed = parseFloat(raw);
+                          if (!isNaN(parsed) && parsed >= 0) {
+                            updateLocal(p.id, { overridePrice: parsed });
                           }
                         }
                       }}
