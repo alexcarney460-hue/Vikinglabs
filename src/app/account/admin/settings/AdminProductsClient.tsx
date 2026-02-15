@@ -25,6 +25,8 @@ export default function AdminProductsClient({ initialProducts }: Props) {
   const [changes, setChanges] = useState<Record<string, { overridePrice?: number | null; inventory?: number | null; enabled?: boolean }>>({});
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
+  
+  // Supabase integration ready
 
   const sorted = useMemo(() => {
     return [...products].sort((a, b) => a.name.localeCompare(b.name));
