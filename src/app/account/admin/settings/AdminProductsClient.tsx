@@ -46,6 +46,8 @@ export default function AdminProductsClient({ initialProducts }: Props) {
         enabled: change.enabled,
       }));
 
+      console.log('[Save] Sending:', updates);
+
       const res = await fetch('/api/admin/products', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -53,6 +55,7 @@ export default function AdminProductsClient({ initialProducts }: Props) {
       });
 
       const data = await res.json();
+      console.log('[Save] Response:', { status: res.status, ok: res.ok, data });
       if (!res.ok || !data.ok) throw new Error(data.error || 'Save failed');
 
       // Update products with new prices/inventory
@@ -182,12 +185,13 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                         value={overridePrice !== null ? String(overridePrice) : ''}
                         onChange={(e) => {
-                          const raw = e.currentTarget.value;
+                          const raw = e.currentTarget.value.trim();
                           if (raw === '') {
                             updateProduct(p.id, 'overridePrice', null);
-                          } else {
+                          } else if (/^[\d.]*$/.test(raw)) {
+                            // Allow any digits/decimals during typing
                             const num = parseFloat(raw);
-                            if (!isNaN(num) && num >= 0) {
+                            if (!isNaN(num)) {
                               updateProduct(p.id, 'overridePrice', num);
                             }
                           }
