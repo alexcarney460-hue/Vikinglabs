@@ -82,7 +82,10 @@ export async function listProductOverrides(): Promise<Record<string, ProductOver
     console.log(`[listProductOverrides] Using Supabase`);
     try {
       const { data: rows, error } = await supabase.from('product_overrides').select('*');
-      if (error) throw error;
+      if (error) {
+        console.error(`[listProductOverrides] Supabase query error:`, error);
+        throw error;
+      }
 
       const map: Record<string, ProductOverride> = {};
       for (const row of (rows || []) as any[]) {
@@ -95,7 +98,10 @@ export async function listProductOverrides(): Promise<Record<string, ProductOver
           updatedAt: row.updated_at,
         };
       }
-      console.log(`[listProductOverrides] Found ${Object.keys(map).length} overrides in Supabase`);
+      console.log(`[listProductOverrides] Found ${Object.keys(map).length} overrides:`, Object.keys(map).slice(0, 5));
+      if (Object.keys(map).includes('bpc-157')) {
+        console.log(`[listProductOverrides] BPC-157 override:`, map['bpc-157']);
+      }
       return map;
     } catch (err) {
       console.error(`[listProductOverrides] Supabase error:`, err);
@@ -157,18 +163,32 @@ export async function upsertProductOverride(input: {
   if (supabase) {
     console.log(`[upsertProductOverride] Using Supabase`);
     try {
-      await supabase.from('product_overrides').upsert({
+      const upsertData = {
         product_id: productId,
         enabled: input.enabled ?? true,
-        price: input.price ?? null,
-        inventory: input.inventory ?? null,
-        image: input.image ?? null,
+        price: input.price !== undefined ? input.price : null,
+        inventory: input.inventory !== undefined ? input.inventory : null,
+        image: input.image !== undefined ? input.image : null,
         updated_at: now,
-      });
+      };
+      
+      console.log(`[upsertProductOverride] Upserting to Supabase:`, upsertData);
+      
+      const { error: upsertError } = await supabase.from('product_overrides').upsert(upsertData);
+      if (upsertError) {
+        console.error(`[upsertProductOverride] Upsert error:`, upsertError);
+        throw upsertError;
+      }
 
+      console.log(`[upsertProductOverride] Upsert successful, fetching back...`);
       const { data: row, error } = await supabase.from('product_overrides').select('*').eq('product_id', productId).single();
       
-      if (error) throw error;
+      if (error) {
+        console.error(`[upsertProductOverride] Fetch error:`, error);
+        throw error;
+      }
+      
+      console.log(`[upsertProductOverride] Fetched row:`, row);
       
       const result_obj = {
         productId: row.product_id,
