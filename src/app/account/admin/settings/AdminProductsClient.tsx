@@ -87,6 +87,7 @@ function ProductCard({ product, edited, updateLocal, uploadingImage, handleImage
             <input
               type="text"
               inputMode="decimal"
+              data-product-price={p.id}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               defaultValue={
                 getDisplayValue(p, 'overridePrice') !== null
@@ -115,6 +116,7 @@ function ProductCard({ product, edited, updateLocal, uploadingImage, handleImage
             <input
               type="text"
               inputMode="numeric"
+              data-product-inventory={p.id}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               defaultValue={getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''}
               onInput={(e) => {
@@ -282,13 +284,46 @@ export default function AdminProductsClient({ initialProducts }: Props) {
     setError('');
 
     try {
-      const updates = Array.from(edited.values()).map((edit) => ({
+      // Re-validate edited entries by reading from DOM to catch any unprocessed input
+      const finalEdited = new Map(edited);
+      
+      // For each edited product, check if there's a price or inventory input with a different value
+      for (const [productId, edit] of finalEdited) {
+        const priceInput = document.querySelector(`input[data-product-price="${productId}"]`) as HTMLInputElement;
+        const inventoryInput = document.querySelector(`input[data-product-inventory="${productId}"]`) as HTMLInputElement;
+        
+        let updatedEdit = { ...edit };
+        
+        if (priceInput && priceInput.value) {
+          const parsed = parseFloat(priceInput.value);
+          if (!isNaN(parsed) && parsed >= 0) {
+            updatedEdit.overridePrice = parsed;
+          }
+        } else if (priceInput && !priceInput.value) {
+          updatedEdit.overridePrice = null;
+        }
+        
+        if (inventoryInput && inventoryInput.value) {
+          const parsed = parseInt(inventoryInput.value, 10);
+          if (!isNaN(parsed) && parsed >= 0) {
+            updatedEdit.inventory = parsed;
+          }
+        } else if (inventoryInput && !inventoryInput.value) {
+          updatedEdit.inventory = null;
+        }
+        
+        finalEdited.set(productId, updatedEdit);
+      }
+
+      const updates = Array.from(finalEdited.values()).map((edit) => ({
         productId: edit.id,
         enabled: edit.enabled,
         overridePrice: edit.overridePrice,
         inventory: edit.inventory,
         image: edit.image,
       }));
+
+      console.log('[Save] Sending updates:', updates);
 
       const res = await fetch('/api/admin/products', {
         method: 'PATCH',
@@ -297,6 +332,7 @@ export default function AdminProductsClient({ initialProducts }: Props) {
       });
 
       const data = await res.json().catch(() => ({}));
+      console.log('[Save] Response:', { ok: res.ok, data });
       if (!res.ok || !data.ok) throw new Error(data.error || 'Save failed');
 
       // Update local products with new data
