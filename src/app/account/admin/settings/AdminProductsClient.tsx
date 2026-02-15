@@ -212,13 +212,18 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                       <input
                         type="number"
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                        value={inventory !== null ? String(inventory) : ''}
-                        onChange={(e) => {
-                          const raw = e.currentTarget.value;
+                        defaultValue={inventory !== null ? String(inventory) : ''}
+                        onBlur={(e) => {
+                          const raw = e.currentTarget.value.trim();
                           if (raw === '') {
                             updateProduct(p.id, 'inventory', null);
+                            e.currentTarget.value = '';
                           } else {
-                            updateProduct(p.id, 'inventory', parseInt(raw, 10));
+                            const num = parseInt(raw, 10);
+                            if (!isNaN(num) && num >= 0) {
+                              updateProduct(p.id, 'inventory', num);
+                              e.currentTarget.value = String(num);
+                            }
                           }
                         }}
                         placeholder="e.g. 25"
