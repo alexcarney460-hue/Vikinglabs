@@ -1,5 +1,8 @@
 import CatalogClient from './CatalogClient';
 
+export const revalidate = 0; // No caching
+export const dynamic = 'force-dynamic'; // Always fresh
+
 export default async function CatalogPage({
   searchParams,
 }: {

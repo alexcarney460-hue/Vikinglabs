@@ -189,15 +189,17 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                         type="text"
                         inputMode="decimal"
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                        value={overridePrice !== null ? String(overridePrice) : ''}
-                        onChange={(e) => {
-                          const raw = e.currentTarget.value;
+                        defaultValue={overridePrice !== null ? String(overridePrice) : ''}
+                        onBlur={(e) => {
+                          const raw = e.currentTarget.value.trim();
                           if (raw === '') {
                             updateProduct(p.id, 'overridePrice', null);
+                            e.currentTarget.value = '';
                           } else {
                             const num = parseFloat(raw);
                             if (!isNaN(num) && num >= 0) {
                               updateProduct(p.id, 'overridePrice', num);
+                              e.currentTarget.value = num.toFixed(2);
                             }
                           }
                         }}
