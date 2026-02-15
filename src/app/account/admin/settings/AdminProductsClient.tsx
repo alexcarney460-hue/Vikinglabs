@@ -443,6 +443,7 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
+                      key={`price-${p.id}-${getDisplayValue(p, 'overridePrice')}`}
                       type="text"
                       inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
