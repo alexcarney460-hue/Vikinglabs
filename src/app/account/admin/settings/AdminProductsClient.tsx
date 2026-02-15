@@ -453,29 +453,32 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                       }
                       onChange={(e) => {
                         const raw = e.target.value;
-                        // Accept any numeric input, even incomplete (e.g., "2", "29", "29.")
-                        // Only reject non-numeric characters
+                        console.log('[Price Override] Raw input:', raw);
+                        
+                        // Accept any characters for display (let user type freely)
                         if (raw === '' || /^[\d.]*$/.test(raw)) {
-                          e.target.value = raw;
-                          // Parse and store only when it looks valid
-                          if (raw && /^\d+(\.\d{0,2})?$/.test(raw)) {
+                          console.log('[Price Override] Character check passed:', raw);
+                          
+                          // Only update state if it's a valid price
+                          if (raw === '') {
+                            console.log('[Price Override] Clearing price');
+                            updateLocal(p.id, { overridePrice: null });
+                          } else if (/^\d+(\.\d{0,2})?$/.test(raw)) {
                             const parsed = parseFloat(raw);
+                            console.log('[Price Override] Valid price entered:', raw, '→ parsed:', parsed);
                             if (!isNaN(parsed) && parsed >= 0) {
                               updateLocal(p.id, { overridePrice: parsed });
                             }
-                          } else if (!raw) {
-                            updateLocal(p.id, { overridePrice: null });
+                          } else {
+                            console.log('[Price Override] Invalid format (incomplete):', raw);
                           }
+                        } else {
+                          console.log('[Price Override] Non-numeric char rejected');
                         }
                       }}
                       onBlur={(e) => {
                         const raw = e.target.value.trim();
-                        if (raw && /^\d+(\.\d{0,2})?$/.test(raw)) {
-                          const parsed = parseFloat(raw);
-                          e.target.value = parsed.toFixed(2);
-                        } else if (!raw) {
-                          e.target.value = '';
-                        }
+                        console.log('[Price Override] Blur - formatting:', raw);
                       }}
                       placeholder={p.basePrice.toFixed(2)}
                     />
