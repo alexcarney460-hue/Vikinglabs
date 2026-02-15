@@ -35,6 +35,8 @@ export async function PATCH(req: NextRequest) {
       const inventory = update.inventory;
       const image = update.image;
 
+      console.log(`[PATCH] Updating product ${productId}:`, { enabled, price, inventory, image });
+
       const updated = await upsertProductOverride({
         productId,
         enabled: typeof enabled === 'boolean' ? enabled : undefined,
@@ -43,6 +45,7 @@ export async function PATCH(req: NextRequest) {
         image: image !== undefined ? image : undefined,
       });
 
+      console.log(`[PATCH] Updated result:`, updated);
       results.push(updated);
     }
 
