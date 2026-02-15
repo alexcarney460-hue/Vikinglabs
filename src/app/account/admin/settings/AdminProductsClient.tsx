@@ -95,15 +95,23 @@ function ProductCard({ product, edited, updateLocal, uploadingImage, handleImage
               }
               onInput={(e) => {
                 const raw = (e.target as HTMLInputElement).value;
+                console.log(`[Price Input] ${p.id}: raw="${raw}"`);
                 if (raw === '' || /^[\d.]*$/.test(raw)) {
+                  console.log(`[Price Input] Character check passed`);
                   if (raw === '') {
+                    console.log(`[Price Input] Clearing price`);
                     updateLocal(p.id, { overridePrice: null });
                   } else if (/^\d+(\.\d{1,2})?$/.test(raw)) {
                     const parsed = parseFloat(raw);
+                    console.log(`[Price Input] Valid price: ${raw} → ${parsed}`);
                     if (!isNaN(parsed) && parsed >= 0) {
                       updateLocal(p.id, { overridePrice: parsed });
                     }
+                  } else {
+                    console.log(`[Price Input] Incomplete: "${raw}"`);
                   }
+                } else {
+                  console.log(`[Price Input] Invalid characters`);
                 }
               }}
               placeholder={p.basePrice.toFixed(2)}
@@ -183,12 +191,15 @@ export default function AdminProductsClient({ initialProducts }: Props) {
   const hasChanges = edited.size > 0;
 
   function updateLocal(productId: string, patch: Partial<Pick<AdminProduct, 'enabled' | 'overridePrice' | 'inventory'>> & { image?: string | null }) {
+    console.log(`[updateLocal] ${productId}:`, patch);
     const existing = edited.get(productId) || { id: productId };
     const updated = { ...existing, ...patch };
+    console.log(`[updateLocal] Updated entry:`, updated);
     const newEdited = new Map(edited);
     newEdited.set(productId, updated);
     setEdited(newEdited);
     setStatus('idle');
+    console.log(`[updateLocal] New edited map size:`, newEdited.size);
   }
 
   async function handleImageUpload(productId: string, file: File) {
@@ -343,13 +354,22 @@ export default function AdminProductsClient({ initialProducts }: Props) {
 
   const getDisplayValue = (product: AdminProduct, field: keyof EditedProduct) => {
     const edit = edited.get(product.id);
-    if (edit && field in edit && edit[field as keyof EditedProduct] !== undefined) {
-      return edit[field as keyof EditedProduct];
+    const value = edit && field in edit && edit[field as keyof EditedProduct] !== undefined 
+      ? edit[field as keyof EditedProduct]
+      : product[field as keyof AdminProduct];
+    if (field === 'overridePrice' && product.id === 'bpc-157') {
+      console.log(`[getDisplayValue] ${product.id}.${field}:`, value);
     }
-    return product[field as keyof AdminProduct];
+    return value;
   };
 
-  const hasProductChanges = (productId: string) => edited.has(productId);
+  const hasProductChanges = (productId: string) => {
+    const has = edited.has(productId);
+    if (productId === 'bpc-157') {
+      console.log(`[hasProductChanges] ${productId}: ${has}, edited map keys:`, Array.from(edited.keys()));
+    }
+    return has;
+  };
 
   return (
     <div className="grid gap-6">
