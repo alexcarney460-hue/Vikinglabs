@@ -476,15 +476,27 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Inventory (nullable)
                     <input
-                      type="number"
+                      key={`inventory-${p.id}-${getDisplayValue(p, 'inventory')}`}
+                      type="text"
+                      inputMode="numeric"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
+                      defaultValue={
+                        getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''
+                      }
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim();
                         if (!raw) {
                           updateLocal(p.id, { inventory: null });
+                          e.target.value = '';
                         } else {
-                          updateLocal(p.id, { inventory: Number(raw) });
+                          const parsed = parseInt(raw, 10);
+                          if (!isNaN(parsed) && parsed >= 0) {
+                            updateLocal(p.id, { inventory: parsed });
+                            e.target.value = String(parsed);
+                          } else {
+                            const prev = getDisplayValue(p, 'inventory');
+                            e.target.value = prev !== null ? String(prev) : '';
+                          }
                         }
                       }}
                       placeholder="e.g. 25"
