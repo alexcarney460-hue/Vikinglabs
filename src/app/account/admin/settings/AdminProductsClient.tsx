@@ -290,6 +290,7 @@ export default function AdminProductsClient({ initialProducts }: Props) {
         image: edit.image,
       }));
 
+      console.log('[Save] Current edited map:', edited);
       console.log('[Save] Sending updates:', updates);
 
       const res = await fetch('/api/admin/products', {
@@ -299,13 +300,19 @@ export default function AdminProductsClient({ initialProducts }: Props) {
       });
 
       const data = await res.json().catch(() => ({}));
-      console.log('[Save] Response:', { ok: res.ok, data });
+      console.log('[Save] Response status:', res.status, 'data:', data);
       if (!res.ok || !data.ok) throw new Error(data.error || 'Save failed');
+
+      console.log('[Save] Success! Updating local products...');
 
       // Update local products with new data
       const updatedProducts = products.map((p) => {
         const edit = edited.get(p.id);
-        if (!edit) return p;
+        if (!edit) {
+          console.log(`[Save] No edit for ${p.id}, keeping original`);
+          return p;
+        }
+        console.log(`[Save] Updating ${p.id}:`, edit);
         return {
           ...p,
           enabled: edit.enabled !== undefined ? edit.enabled : p.enabled,
@@ -316,11 +323,13 @@ export default function AdminProductsClient({ initialProducts }: Props) {
         };
       });
 
+      console.log('[Save] Updated products:', updatedProducts);
       setProducts(updatedProducts);
       setEdited(new Map());
       setStatus('success');
       setTimeout(() => setStatus('idle'), 2000);
     } catch (err) {
+      console.error('[Save] Error:', err);
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Unable to save changes');
     }
