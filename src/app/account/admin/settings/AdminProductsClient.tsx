@@ -435,8 +435,9 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Enabled
                     <input
+                      key={`enabled-${p.id}`}
                       type="checkbox"
-                      checked={Boolean(getDisplayValue(p, 'enabled') ?? p.enabled)}
+                      defaultChecked={Boolean(getDisplayValue(p, 'enabled') ?? p.enabled)}
                       onChange={(e) => updateLocal(p.id, { enabled: e.target.checked })}
                     />
                   </label>
