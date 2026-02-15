@@ -26,10 +26,10 @@ export default function Header() {
         <Link href="/" className="flex items-center gap-3 group" onClick={() => setMenuOpen(false)}>
           <div className="relative -mt-[78px] md:-mt-[68px] h-16 w-56 shrink-0 transition-transform group-hover:scale-105">
             <img
-              src="/logo-header.png"
+              src="/vikinglabs-logo.png"
               alt="Viking Labs"
               width={260}
-              height={80}
+              height={120}
               className="object-contain"
             />
           </div>
