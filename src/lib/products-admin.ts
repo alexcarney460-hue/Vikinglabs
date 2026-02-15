@@ -2,6 +2,7 @@ import { type Product } from '@/app/catalog/data';
 import { getSql, hasPooledDatabase } from './db';
 import { readJson, writeJson } from './storage';
 import { listAllProducts } from './products-storage';
+import { getSupabase } from './supabase';
 
 export type ProductOverride = {
   productId: string;
@@ -25,26 +26,84 @@ type Store = { overrides: Record<string, ProductOverride> };
 const STORAGE_FILE = 'product-overrides.json';
 const EMPTY_STORE: Store = { overrides: {} };
 
+async function ensureSupabaseTables() {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  
+  try {
+    // Create table if it doesn't exist by trying to select from it
+    const { error } = await supabase.from('product_overrides').select('*').limit(1);
+    
+    if (error && error.code === 'PGRST116') {
+      // Table doesn't exist, create it
+      console.log('[ensureSupabaseTables] Creating product_overrides table...');
+      // We can't create tables via supabase client, but we can try via RPC or raw SQL
+      // For now, just log that it needs to be created manually
+      console.error('[ensureSupabaseTables] Table does not exist. Please create it manually in Supabase.');
+    }
+  } catch (err) {
+    console.error('[ensureSupabaseTables] Error:', err);
+  }
+}
+
 function hasDatabase() {
   return hasPooledDatabase();
 }
 
 async function ensureTables() {
   const sql = await getSql();
-  if (!sql) return;
-  await sql`
-    CREATE TABLE IF NOT EXISTS product_overrides (
-      product_id text PRIMARY KEY,
-      enabled boolean NOT NULL DEFAULT true,
-      price numeric NULL,
-      inventory int NULL,
-      image text NULL,
-      updated_at timestamptz NOT NULL
-    );
-  `;
+  if (!sql) {
+    console.log('[ensureTables] No database connection available');
+    return;
+  }
+  try {
+    console.log('[ensureTables] Creating table if not exists...');
+    await sql`
+      CREATE TABLE IF NOT EXISTS product_overrides (
+        product_id text PRIMARY KEY,
+        enabled boolean NOT NULL DEFAULT true,
+        price numeric NULL,
+        inventory int NULL,
+        image text NULL,
+        updated_at timestamptz NOT NULL
+      );
+    `;
+    console.log('[ensureTables] Table ready');
+  } catch (err) {
+    console.error('[ensureTables] Error creating table:', err);
+    throw err;
+  }
 }
 
 export async function listProductOverrides(): Promise<Record<string, ProductOverride>> {
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    console.log(`[listProductOverrides] Using Supabase`);
+    try {
+      const { data: rows, error } = await supabase.from('product_overrides').select('*');
+      if (error) throw error;
+
+      const map: Record<string, ProductOverride> = {};
+      for (const row of (rows || []) as any[]) {
+        map[row.product_id] = {
+          productId: row.product_id,
+          enabled: Boolean(row.enabled),
+          price: row.price === null ? null : Number(row.price),
+          inventory: row.inventory === null ? null : Number(row.inventory),
+          image: row.image || null,
+          updatedAt: row.updated_at,
+        };
+      }
+      console.log(`[listProductOverrides] Found ${Object.keys(map).length} overrides in Supabase`);
+      return map;
+    } catch (err) {
+      console.error(`[listProductOverrides] Supabase error:`, err);
+      throw err;
+    }
+  }
+
+  // Fallback to SQL
   if (hasDatabase()) {
     const sql = await getSql();
     if (sql) {
@@ -74,6 +133,7 @@ export async function listProductOverrides(): Promise<Record<string, ProductOver
     }
   }
 
+  console.log(`[listProductOverrides] Falling back to JSON file storage`);
   const store = await readJson<Store>(STORAGE_FILE, EMPTY_STORE);
   return store.overrides;
 }
@@ -92,6 +152,41 @@ export async function upsertProductOverride(input: {
 
   const now = new Date().toISOString();
 
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    console.log(`[upsertProductOverride] Using Supabase`);
+    try {
+      await supabase.from('product_overrides').upsert({
+        product_id: productId,
+        enabled: input.enabled ?? true,
+        price: input.price ?? null,
+        inventory: input.inventory ?? null,
+        image: input.image ?? null,
+        updated_at: now,
+      });
+
+      const { data: row, error } = await supabase.from('product_overrides').select('*').eq('product_id', productId).single();
+      
+      if (error) throw error;
+      
+      const result_obj = {
+        productId: row.product_id,
+        enabled: Boolean(row.enabled),
+        price: row.price === null ? null : Number(row.price),
+        inventory: row.inventory === null ? null : Number(row.inventory),
+        image: row.image || null,
+        updatedAt: row.updated_at,
+      };
+      console.log(`[upsertProductOverride] Supabase result:`, result_obj);
+      return result_obj;
+    } catch (err) {
+      console.error(`[upsertProductOverride] Supabase error:`, err);
+      throw err;
+    }
+  }
+
+  // Fallback to SQL if available
   if (hasDatabase()) {
     const sql = await getSql();
     if (sql) {
@@ -123,7 +218,7 @@ export async function upsertProductOverride(input: {
     }
   }
 
-  console.log(`[upsertProductOverride] Using JSON file storage`);
+  console.log(`[upsertProductOverride] Falling back to JSON file storage`);
   const store = await readJson<Store>(STORAGE_FILE, EMPTY_STORE);
   const current = store.overrides[productId] ?? {
     productId,
