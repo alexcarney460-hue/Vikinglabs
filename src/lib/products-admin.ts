@@ -87,6 +87,8 @@ export async function upsertProductOverride(input: {
 }): Promise<ProductOverride> {
   const productId = input.productId;
   if (!productId) throw new Error('productId is required');
+  
+  console.log(`[upsertProductOverride] Input:`, input);
 
   const now = new Date().toISOString();
 
@@ -94,6 +96,7 @@ export async function upsertProductOverride(input: {
     const sql = await getSql();
     if (sql) {
       await ensureTables();
+      console.log(`[upsertProductOverride] Using database`);
       const result = await sql`
         INSERT INTO product_overrides (product_id, enabled, price, inventory, image, updated_at)
         VALUES (${productId}, COALESCE(${input.enabled ?? null}, true), ${input.price ?? null}, ${input.inventory ?? null}, ${input.image ?? null}, ${now})
@@ -107,7 +110,7 @@ export async function upsertProductOverride(input: {
       `;
 
       const row = result.rows[0] as any;
-      return {
+      const result_obj = {
         productId: row.productId,
         enabled: Boolean(row.enabled),
         price: row.price === null || row.price === undefined ? null : Number(row.price),
@@ -115,9 +118,12 @@ export async function upsertProductOverride(input: {
         image: row.image || null,
         updatedAt: new Date(row.updatedAt).toISOString(),
       };
+      console.log(`[upsertProductOverride] Database result:`, result_obj);
+      return result_obj;
     }
   }
 
+  console.log(`[upsertProductOverride] Using JSON file storage`);
   const store = await readJson<Store>(STORAGE_FILE, EMPTY_STORE);
   const current = store.overrides[productId] ?? {
     productId,
@@ -137,8 +143,10 @@ export async function upsertProductOverride(input: {
     updatedAt: now,
   };
 
+  console.log(`[upsertProductOverride] Next value:`, next);
   store.overrides[productId] = next;
   await writeJson(STORAGE_FILE, store);
+  console.log(`[upsertProductOverride] Wrote to storage`);
   return next;
 }
 
