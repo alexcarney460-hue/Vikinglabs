@@ -443,24 +443,38 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                       value={
                         getDisplayValue(p, 'overridePrice') !== null
-                          ? getDisplayValue(p, 'overridePrice')
+                          ? String(getDisplayValue(p, 'overridePrice'))
                           : ''
                       }
                       onChange={(e) => {
                         const raw = e.target.value;
-                        if (!raw) {
-                          updateLocal(p.id, { overridePrice: null });
-                        } else {
-                          const parsed = parseFloat(raw);
-                          if (!isNaN(parsed) && parsed >= 0) {
-                            updateLocal(p.id, { overridePrice: parsed });
+                        // Accept any numeric input, even incomplete (e.g., "2", "29", "29.")
+                        // Only reject non-numeric characters
+                        if (raw === '' || /^[\d.]*$/.test(raw)) {
+                          e.target.value = raw;
+                          // Parse and store only when it looks valid
+                          if (raw && /^\d+(\.\d{0,2})?$/.test(raw)) {
+                            const parsed = parseFloat(raw);
+                            if (!isNaN(parsed) && parsed >= 0) {
+                              updateLocal(p.id, { overridePrice: parsed });
+                            }
+                          } else if (!raw) {
+                            updateLocal(p.id, { overridePrice: null });
                           }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim();
+                        if (raw && /^\d+(\.\d{0,2})?$/.test(raw)) {
+                          const parsed = parseFloat(raw);
+                          e.target.value = parsed.toFixed(2);
+                        } else if (!raw) {
+                          e.target.value = '';
                         }
                       }}
                       placeholder={p.basePrice.toFixed(2)}
