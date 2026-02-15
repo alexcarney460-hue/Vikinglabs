@@ -31,7 +31,6 @@ type Props = {
 export default function AdminProductsClient({ initialProducts }: Props) {
   const [products, setProducts] = useState<AdminProduct[]>(initialProducts);
   const [edited, setEdited] = useState<Map<string, EditedProduct>>(new Map());
-  const [priceInput, setPriceInput] = useState<Map<string, string>>(new Map());
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
@@ -447,26 +446,22 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                       type="text"
                       inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={priceInput.get(p.id) ?? (getDisplayValue(p, 'overridePrice') !== null ? String(getDisplayValue(p, 'overridePrice')) : '')}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setPriceInput(new Map(priceInput).set(p.id, raw));
-                        
+                      defaultValue={
+                        getDisplayValue(p, 'overridePrice') !== null
+                          ? String(getDisplayValue(p, 'overridePrice'))
+                          : ''
+                      }
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim();
                         if (!raw) {
                           updateLocal(p.id, { overridePrice: null });
+                          e.target.value = '';
                         } else {
                           const parsed = parseFloat(raw);
                           if (!isNaN(parsed) && parsed >= 0) {
                             updateLocal(p.id, { overridePrice: parsed });
+                            e.target.value = parsed.toFixed(2);
                           }
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const raw = e.target.value;
-                        if (raw && !isNaN(parseFloat(raw))) {
-                          const newInput = new Map(priceInput);
-                          newInput.delete(p.id);
-                          setPriceInput(newInput);
                         }
                       }}
                       placeholder={p.basePrice.toFixed(2)}
