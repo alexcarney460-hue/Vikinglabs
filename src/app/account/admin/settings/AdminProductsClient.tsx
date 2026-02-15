@@ -1,4 +1,5 @@
 'use client';
+// Force rebuild
 
 import { useMemo, useState } from 'react';
 
@@ -443,21 +444,23 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Price override ($)
                     <input
+                      key={`price-${p.id}`}
                       type="text"
                       inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={
+                      defaultValue={
                         getDisplayValue(p, 'overridePrice') !== null
                           ? String(getDisplayValue(p, 'overridePrice'))
                           : ''
                       }
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        // Allow intermediate typing: digits, optional decimal + 0-2 decimals OR trailing decimal
-                        if (raw === '' || /^\d+\.?\d{0,2}$/.test(raw)) {
-                          if (!raw) {
+                      onInput={(e) => {
+                        const raw = (e.target as HTMLInputElement).value;
+                        // Accept any digits/dots for live display
+                        if (raw === '' || /^[\d.]*$/.test(raw)) {
+                          // Only update state if complete number
+                          if (raw === '') {
                             updateLocal(p.id, { overridePrice: null });
-                          } else {
+                          } else if (/^\d+(\.\d{1,2})?$/.test(raw)) {
                             const parsed = parseFloat(raw);
                             if (!isNaN(parsed) && parsed >= 0) {
                               updateLocal(p.id, { overridePrice: parsed });
@@ -472,12 +475,13 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                   <label className="grid gap-1 text-xs font-bold text-slate-600">
                     Inventory (nullable)
                     <input
+                      key={`inventory-${p.id}`}
                       type="text"
                       inputMode="numeric"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
+                      defaultValue={getDisplayValue(p, 'inventory') !== null ? String(getDisplayValue(p, 'inventory')) : ''}
+                      onInput={(e) => {
+                        const raw = (e.target as HTMLInputElement).value;
                         if (!raw) {
                           updateLocal(p.id, { inventory: null });
                         } else if (/^\d+$/.test(raw)) {
