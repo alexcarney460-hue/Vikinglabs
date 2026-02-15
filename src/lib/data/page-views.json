@@ -1,6 +1,13 @@
 {
   "views": [
     {
+      "id": "dc52d93e-1682-4b91-a046-567aa7039aaa",
+      "path": "/",
+      "referrer": "http://localhost:3000/",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+      "createdAt": "2026-02-15T07:30:25.410Z"
+    },
+    {
       "id": "fb5ad3b2-09c6-4a2b-a901-127d69e18b18",
       "path": "/account/login",
       "referrer": "http://localhost:3000/account/login",

@@ -16,7 +16,14 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const res = await fetch('/api/products');
+        const res = await fetch('/api/products', { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         const data = await res.json();
         if (data.ok && data.products) {
           setProducts(data.products);
