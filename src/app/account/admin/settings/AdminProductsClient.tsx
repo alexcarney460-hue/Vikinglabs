@@ -446,24 +446,25 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                       type="text"
                       inputMode="decimal"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={
+                      defaultValue={
                         getDisplayValue(p, 'overridePrice') !== null
                           ? String(getDisplayValue(p, 'overridePrice'))
                           : ''
                       }
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        // Only allow digits and single decimal point
-                        if (raw === '' || /^[\d.]*$/.test(raw)) {
-                          // Clear if empty
-                          if (raw === '') {
-                            updateLocal(p.id, { overridePrice: null });
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim();
+                        if (!raw) {
+                          updateLocal(p.id, { overridePrice: null });
+                          e.target.value = '';
+                        } else {
+                          const parsed = parseFloat(raw);
+                          if (!isNaN(parsed) && parsed >= 0) {
+                            updateLocal(p.id, { overridePrice: parsed });
+                            e.target.value = parsed.toFixed(2);
                           } else {
-                            // Try to parse as float
-                            const parsed = parseFloat(raw);
-                            if (!isNaN(parsed) && parsed >= 0 && raw !== '.') {
-                              updateLocal(p.id, { overridePrice: parsed });
-                            }
+                            // Invalid, revert to previous value
+                            const prev = getDisplayValue(p, 'overridePrice');
+                            e.target.value = prev !== null ? String(prev) : '';
                           }
                         }
                       }}
