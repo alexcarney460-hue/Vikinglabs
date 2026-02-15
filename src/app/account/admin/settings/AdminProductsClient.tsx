@@ -74,7 +74,11 @@ export default function AdminProductsClient({ initialProducts }: Props) {
       setProducts(updatedProducts);
       setChanges({});
       setStatus('success');
-      setTimeout(() => setStatus('idle'), 2000);
+      
+      // Force page reload after 1 second to guarantee fresh data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Unable to save changes');
