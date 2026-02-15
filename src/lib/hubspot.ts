@@ -1,101 +1,87 @@
-const HUBSPOT_API_BASE = 'https://api.hubapi.com';
+const HUBSPOT_API_URL = 'https://api.hubapi.com';
+const HUBSPOT_API_KEY = process.env.HUBSPOT_API_KEY;
 
-const token = process.env.HUBSPOT_PRIVATE_TOKEN;
+export type ContactInput = {
+  email: string;
+  firstname?: string;
+  lastname?: string;
+  phone?: string;
+  company?: string;
+  website?: string;
+  message?: string;
+  source?: string; // e.g., 'contact_form', 'affiliate_signup', 'cart_abandonment'
+  product_interest?: string;
+};
 
-if (!token) {
-  console.warn('[HubSpot] HUBSPOT_PRIVATE_TOKEN is not set. Submissions will fail.');
-}
-
-async function hubspotFetch<T>(path: string, init: RequestInit): Promise<T> {
-  if (!token) {
-    throw new Error('Missing HUBSPOT_PRIVATE_TOKEN');
+export async function createOrUpdateContact(contact: ContactInput) {
+  if (!HUBSPOT_API_KEY) {
+    throw new Error('HUBSPOT_API_KEY not configured');
   }
 
-  const res = await fetch(`${HUBSPOT_API_BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init.headers || {}),
-    },
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`HubSpot request failed (${res.status}): ${text}`);
-  }
-
-  if (res.status === 204) {
-    return undefined as T;
-  }
-
-  const text = await res.text();
-  if (!text) {
-    return undefined as T;
-  }
-
-  return JSON.parse(text) as T;
-}
-
-async function findContactByEmail(email: string): Promise<string | null> {
   try {
-    const data = await hubspotFetch<{ results: Array<{ id: string }> }>(
-      '/crm/v3/objects/contacts/search',
+    const properties = [
+      { property: 'email', value: contact.email },
+    ];
+
+    if (contact.firstname) properties.push({ property: 'firstname', value: contact.firstname });
+    if (contact.lastname) properties.push({ property: 'lastname', value: contact.lastname });
+    if (contact.phone) properties.push({ property: 'phone', value: contact.phone });
+    if (contact.company) properties.push({ property: 'company', value: contact.company });
+    if (contact.website) properties.push({ property: 'website', value: contact.website });
+    if (contact.message) properties.push({ property: 'message', value: contact.message });
+    if (contact.source) properties.push({ property: 'hs_lead_status', value: contact.source });
+    if (contact.product_interest) properties.push({ property: 'product_interest', value: contact.product_interest });
+
+    const response = await fetch(`${HUBSPOT_API_URL}/crm/v3/objects/contacts/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${HUBSPOT_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        properties,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[HubSpot] Error creating contact:', error);
+      throw new Error(error.message || 'Failed to create contact in HubSpot');
+    }
+
+    const data = await response.json();
+    console.log('[HubSpot] Contact created/updated:', data.id);
+    return data;
+  } catch (error) {
+    console.error('[HubSpot] Error:', error);
+    throw error;
+  }
+}
+
+export async function getContact(email: string) {
+  if (!HUBSPOT_API_KEY) {
+    throw new Error('HUBSPOT_API_KEY not configured');
+  }
+
+  try {
+    const response = await fetch(
+      `${HUBSPOT_API_URL}/crm/v3/objects/contacts/?limit=1&filter=email|equals|${encodeURIComponent(email)}`,
       {
-        method: 'POST',
-        body: JSON.stringify({
-          filterGroups: [
-            {
-              filters: [
-                {
-                  propertyName: 'email',
-                  operator: 'EQ',
-                  value: email,
-                },
-              ],
-            },
-          ],
-          limit: 1,
-        }),
+        headers: {
+          'Authorization': `Bearer ${HUBSPOT_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
       }
     );
 
-    if (data.results && data.results.length > 0) {
-      return data.results[0].id;
+    if (!response.ok) {
+      throw new Error('Failed to fetch contact from HubSpot');
     }
-    return null;
-  } catch (err) {
-    console.error('[HubSpot] contact lookup failed', err);
-    return null;
+
+    const data = await response.json();
+    return data.results?.[0] || null;
+  } catch (error) {
+    console.error('[HubSpot] Error fetching contact:', error);
+    throw error;
   }
-}
-
-export type HubSpotContactProperties = Record<string, string | undefined>;
-
-export async function upsertContact(properties: HubSpotContactProperties) {
-  const email = properties.email;
-  if (!email) {
-    throw new Error('Email is required to upsert a HubSpot contact');
-  }
-
-  const contactId = await findContactByEmail(email);
-
-  if (contactId) {
-    await hubspotFetch(`/crm/v3/objects/contacts/${contactId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ properties }),
-    });
-    return contactId;
-  }
-
-  const created = await hubspotFetch<{ id: string }>(
-    '/crm/v3/objects/contacts',
-    {
-      method: 'POST',
-      body: JSON.stringify({ properties }),
-    }
-  );
-
-  return created.id;
 }

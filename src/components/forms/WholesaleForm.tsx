@@ -28,12 +28,20 @@ export default function WholesaleForm() {
     setStatus('submitting');
 
     try {
-      const res = await fetch('/api/hubspot/submit', {
+      const [firstname, ...lastnameParts] = form.contactPerson.split(' ');
+      const lastname = lastnameParts.join(' ') || '';
+
+      const res = await fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          formType: 'wholesale',
-          payload: form,
+          firstname: firstname || undefined,
+          lastname: lastname || undefined,
+          email: form.email,
+          company: form.companyName,
+          website: form.website,
+          message: `Wholesale inquiry\nEstimated volume: ${form.volume}\nDetails: ${form.details}`,
+          source: 'wholesale_inquiry',
         }),
       });
 
@@ -41,9 +49,11 @@ export default function WholesaleForm() {
 
       setStatus('success');
       setForm(defaultState);
+      setTimeout(() => setStatus('idle'), 3000);
     } catch (error) {
-      console.error(error);
+      console.error('[WholesaleForm] Error:', error);
       setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
     }
   };
 

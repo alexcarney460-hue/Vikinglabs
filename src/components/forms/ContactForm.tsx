@@ -26,24 +26,35 @@ export default function ContactForm() {
     setStatus('submitting');
 
     try {
-      const res = await fetch('/api/hubspot/submit', {
+      const [firstname, ...lastnameParts] = form.name.split(' ');
+      const lastname = lastnameParts.join(' ') || '';
+
+      const res = await fetch('/api/contacts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          formType: 'contact',
-          payload: form,
+          firstname: firstname || undefined,
+          lastname: lastname || undefined,
+          email: form.email,
+          message: form.message,
+          source: 'contact_form',
         }),
       });
 
-      if (!res.ok) throw new Error('Submission failed');
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Submission failed');
+      }
 
       setStatus('success');
       setForm(defaultState);
+      setTimeout(() => setStatus('idle'), 3000);
     } catch (error) {
-      console.error(error);
+      console.error('[ContactForm] Error:', error);
       setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
     }
   };
 

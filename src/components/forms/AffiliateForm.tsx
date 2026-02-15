@@ -26,16 +26,36 @@ export default function AffiliateForm() {
     setStatus('loading');
 
     try {
-      const res = await fetch('/api/affiliates/apply', {
+      // Submit to affiliate endpoint
+      const affiliateRes = await fetch('/api/affiliates/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Unable to submit.' }));
+      if (!affiliateRes.ok) {
+        const data = await affiliateRes.json().catch(() => ({ error: 'Unable to submit.' }));
         throw new Error(data.error || 'Unable to submit.');
       }
+
+      // Also push to HubSpot as a lead
+      const [firstname, ...lastnameParts] = form.name.split(' ');
+      const lastname = lastnameParts.join(' ') || '';
+
+      await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstname: firstname || undefined,
+          lastname: lastname || undefined,
+          email: form.email,
+          message: `Affiliate application\nHandle: ${form.socialHandle}\nAudience: ${form.audienceSize}\nChannels: ${form.channels}\nNotes: ${form.notes}`,
+          source: 'affiliate_signup',
+        }),
+      }).catch((error) => {
+        console.error('[AffiliateForm] HubSpot sync failed:', error);
+        // Don't fail the main submission if HubSpot fails
+      });
 
       setStatus('success');
       setForm(defaultForm);
