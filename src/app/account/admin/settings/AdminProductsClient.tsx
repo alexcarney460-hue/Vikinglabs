@@ -191,13 +191,12 @@ export default function AdminProductsClient({ initialProducts }: Props) {
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                         value={overridePrice !== null ? String(overridePrice) : ''}
                         onChange={(e) => {
-                          const raw = e.currentTarget.value.trim();
+                          const raw = e.currentTarget.value;
                           if (raw === '') {
                             updateProduct(p.id, 'overridePrice', null);
-                          } else if (/^[\d.]*$/.test(raw)) {
-                            // Allow any digits/decimals during typing
+                          } else {
                             const num = parseFloat(raw);
-                            if (!isNaN(num)) {
+                            if (!isNaN(num) && num >= 0) {
                               updateProduct(p.id, 'overridePrice', num);
                             }
                           }
