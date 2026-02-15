@@ -20,7 +20,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-100 bg-white shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-slate-100 bg-white shadow-sm overflow-hidden">
       <div className="container mx-auto flex h-24 items-center justify-between px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group" onClick={() => setMenuOpen(false)}>
