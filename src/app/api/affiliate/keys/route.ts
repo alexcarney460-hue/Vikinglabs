@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const body = await req.json();
+    const { name } = body;
+
     const { key, keyRecord } = await createAffiliateApiKey(affiliate.id);
 
     return NextResponse.json(
@@ -74,31 +77,15 @@ export async function POST(req: NextRequest) {
           last4: keyRecord.last4,
           createdAt: keyRecord.createdAt,
           scopes: keyRecord.scopes,
+          name: name || `Key ${keyRecord.last4}`,
         },
       },
       { status: 201 }
     );
   } catch (error) {
+    console.error('[POST /api/affiliate/keys]', error);
     return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
   }
 }
 
-export async function DELETE(req: NextRequest) {
-  // Key revocation requires session auth only (not Bearer) for security
-  const affiliate = await getAffiliateFromSession(req);
-  if (!affiliate) {
-    return NextResponse.json({ error: 'Unauthorized - session required' }, { status: 401 });
-  }
-
-  try {
-    const success = await revokeAffiliateApiKey(affiliate.id);
-
-    if (!success) {
-      return NextResponse.json({ error: 'No API key found to revoke' }, { status: 404 });
-    }
-
-    return NextResponse.json({ message: 'API key revoked successfully' });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to revoke API key' }, { status: 500 });
-  }
-}
+// DELETE moved to /api/affiliate/keys/[id]/route.ts for proper dynamic routing

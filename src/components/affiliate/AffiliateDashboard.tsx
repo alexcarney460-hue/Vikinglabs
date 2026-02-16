@@ -346,11 +346,12 @@ export default function AffiliateDashboard() {
                       });
                       if (res.ok) {
                         const data = await res.json();
-                        setApiKeys([...apiKeys, data.key]);
+                        setApiKeys([...apiKeys, { ...data.keyRecord, name: newKeyName }]);
                         setNewKeyName('');
-                        alert(`Key created! Store it safely:\n\n${data.key.secret}\n\nYou won't be able to see it again.`);
+                        alert(`Key created! Store it safely:\n\n${data.key}\n\nYou won't be able to see it again.`);
                       } else {
-                        alert('Failed to create key');
+                        const err = await res.json();
+                        alert(`Error: ${err.error || 'Failed to create key'}`);
                       }
                     } catch (err) {
                       console.error('Error creating key:', err);
