@@ -29,11 +29,15 @@ async function validateSessionAndGetEmail(): Promise<string | null> {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !hasUserEmail(session)) {
+    if (!session) {
       return null;
     }
 
-    return session.user.email;
+    if (!hasUserEmail(session)) {
+      return null;
+    }
+
+    return session.user?.email ?? null;
   } catch (error) {
     console.error('[affiliate/resources] Session validation error:', error);
     return null;
