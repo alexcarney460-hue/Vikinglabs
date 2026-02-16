@@ -113,7 +113,9 @@ export default function PartnerAgreement() {
   }
 
   const { agreement, affiliate } = data;
-  const tierName = affiliate.currentTier.split('-')[0].trim();
+  const tierName = typeof affiliate.currentTier === 'string' 
+    ? affiliate.currentTier.split('-')[0].trim()
+    : 'Starter';
   const gradientClass = getTierColor(tierName);
 
   return (
@@ -134,18 +136,18 @@ export default function PartnerAgreement() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <p className="text-white/80 text-sm font-medium uppercase tracking-wide">Your Tier</p>
-            <h2 className="text-3xl font-bold mt-2">{affiliate.currentTier}</h2>
+            <h2 className="text-3xl font-bold mt-2">{typeof affiliate.currentTier === 'string' ? affiliate.currentTier : 'Starter Partner'}</h2>
           </div>
           <div>
             <p className="text-white/80 text-sm font-medium uppercase tracking-wide">Commission Rate</p>
             <div className="flex items-baseline gap-1 mt-2">
-              <span className="text-4xl font-bold">{affiliate.commissionRate}</span>
+              <span className="text-4xl font-bold">{typeof affiliate.commissionRate === 'number' ? affiliate.commissionRate : 0}</span>
               <span className="text-2xl">%</span>
             </div>
           </div>
           <div>
             <p className="text-white/80 text-sm font-medium uppercase tracking-wide">30-Day Revenue</p>
-            <p className="text-3xl font-bold mt-2">{formatCurrency(affiliate.referredRevenue30Days)}</p>
+            <p className="text-3xl font-bold mt-2">{formatCurrency(typeof affiliate.referredRevenue30Days === 'number' ? affiliate.referredRevenue30Days : 0)}</p>
           </div>
         </div>
       </div>
