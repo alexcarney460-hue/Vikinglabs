@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/authjs/options';
 import { listAffiliateApplications } from '@/lib/affiliates';
+import { hasUserEmail } from '@/lib/session-guards';
 import AffiliateApiDashboard from '@/components/affiliate/AffiliateApiDashboard';
 
 export const metadata = {
@@ -12,7 +13,7 @@ export const metadata = {
 export default async function AffiliateDashboardPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user || !session.user.email) {
+  if (!hasUserEmail(session)) {
     redirect('/account/login');
   }
 

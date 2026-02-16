@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authjs/options';
+import { hasUserEmail } from '@/lib/session-guards';
 import {
   listAffiliateApplications,
   getAffiliateApiKeyByHash,
@@ -48,12 +49,11 @@ export async function GET(request: NextRequest) {
 
     // Fall back to session auth
     if (!affiliateId) {
-      const session = await getServerSession(authOptions);
-      if (!session || !session.user || !session.user.email) {
+      const session = await getServerSession(authOptions); if (!hasUserEmail(session)) {
         return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-      const userEmail: string = session.user.email;
+      const userEmail = session.user.email;
       const allAffiliates = await listAffiliateApplications('approved');
       const affiliate = allAffiliates.find((a) => a.email === userEmail);
 
@@ -122,12 +122,11 @@ export async function POST(request: NextRequest) {
 
     // Fall back to session auth
     if (!affiliateId) {
-      const session = await getServerSession(authOptions);
-      if (!session || !session.user || !session.user.email) {
+      const session = await getServerSession(authOptions); if (!hasUserEmail(session)) {
         return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-      const userEmail: string = session.user.email;
+      const userEmail = session.user.email;
       const allAffiliates = await listAffiliateApplications('approved');
       const affiliate = allAffiliates.find((a) => a.email === userEmail);
 
@@ -194,12 +193,11 @@ export async function PATCH(request: NextRequest) {
 
     // Fall back to session auth
     if (!affiliateId) {
-      const session = await getServerSession(authOptions);
-      if (!session || !session.user || !session.user.email) {
+      const session = await getServerSession(authOptions); if (!hasUserEmail(session)) {
         return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-      const userEmail: string = session.user.email;
+      const userEmail = session.user.email;
       const allAffiliates = await listAffiliateApplications('approved');
       const affiliate = allAffiliates.find((a) => a.email === userEmail);
 
@@ -271,12 +269,11 @@ export async function DELETE(request: NextRequest) {
 
     // Fall back to session auth
     if (!affiliateId) {
-      const session = await getServerSession(authOptions);
-      if (!session || !session.user || !session.user.email) {
+      const session = await getServerSession(authOptions); if (!hasUserEmail(session)) {
         return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-      const userEmail: string = session.user.email;
+      const userEmail = session.user.email;
       const allAffiliates = await listAffiliateApplications('approved');
       const affiliate = allAffiliates.find((a) => a.email === userEmail);
 
@@ -316,6 +313,10 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+
+
+
 
 
 
