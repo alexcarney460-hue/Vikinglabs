@@ -229,9 +229,10 @@ export async function createAffiliateApplication(input: {
   // Try Supabase first
   const supabase = getSupabase();
   if (supabase) {
+    console.log('[createAffiliateApplication] Using Supabase for', record.email);
     await ensureAffiliateTables();
     try {
-      const { error } = await supabase.from('affiliate_applications').insert([{
+      const { data, error } = await supabase.from('affiliate_applications').insert([{
         id: record.id,
         name: record.name,
         email: record.email,
@@ -250,13 +251,20 @@ export async function createAffiliateApplication(input: {
         discord_user_id: record.discordUserId,
         created_at: record.createdAt,
         updated_at: record.updatedAt,
-      }]);
+      }]).select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[createAffiliateApplication] Supabase error:', error.message, error.details);
+        throw error;
+      }
+      
+      console.log('[createAffiliateApplication] Successfully inserted, data:', data);
       return record;
     } catch (dbError) {
-      console.error('Affiliate Supabase insert failed:', dbError);
+      console.error('[createAffiliateApplication] Supabase insert failed:', dbError);
     }
+  } else {
+    console.log('[createAffiliateApplication] Supabase not available');
   }
 
   // Try @vercel/postgres
