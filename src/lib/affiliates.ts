@@ -845,6 +845,28 @@ export async function notifyAffiliateAdmin(application: AffiliateApplication) {
  * Dashboard Helper Functions for Approved Affiliates
  */
 
+export async function getAffiliateById(id: string): Promise<AffiliateApplication | null> {
+  if (!id) return null;
+
+  const sql = await getDb();
+  if (sql) {
+    const result = await sql`
+      SELECT id, name, email, social_handle, audience_size, channels, notes, status, code,
+             signup_credit_cents, commission_rate, approved_at, expires_at, declined_at,
+             requested_info_at, discord_user_id, created_at, updated_at
+      FROM affiliate_applications
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    if (result.rows.length > 0) {
+      return formatAffiliateRow(result.rows[0] as any);
+    }
+  }
+
+  const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
+  return store.applications.find((app) => app.id === id) || null;
+}
+
 export async function getAffiliateByEmail(email: string): Promise<AffiliateApplication | null> {
   const normalized = normalizeInput(email);
   if (!normalized) return null;
@@ -959,7 +981,7 @@ export type AffiliateSummary = {
 };
 
 export async function getAffiliateSummary(affiliateId: string): Promise<AffiliateSummary | null> {
-  const app = await getAffiliateApplicationById(affiliateId);
+  const app = await getAffiliateById(affiliateId);
   if (!app || app.status !== 'approved') return null;
 
   const conversions = await listAffiliateConversions(affiliateId, 1000);

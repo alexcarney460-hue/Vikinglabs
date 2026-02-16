@@ -285,7 +285,7 @@ export default function AccountClient() {
           </div>
         </div>
       </div>
-      </div>
+      }
 
       {/* Research Library Tab */}
       {activeTab === 'research' && (
