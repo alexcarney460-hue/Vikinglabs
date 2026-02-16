@@ -86,6 +86,56 @@ async function getDb() {
   return getSql();
 }
 
+export type AffiliateApiKey = {
+  id: string;
+  affiliateId: string;
+  apiKeyHash: string;
+  last4: string;
+  scopes: string[];
+  createdAt: string;
+  rotatedAt?: string | null;
+  revokedAt?: string | null;
+};
+
+export type TrackerStack = {
+  id: string;
+  affiliateId: string;
+  name: string;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TrackerEntry = {
+  id: string;
+  stackId: string;
+  affiliateId: string;
+  date: string;
+  dosage?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type AffiliateApiKeyStore = {
+  keys: AffiliateApiKey[];
+};
+
+type TrackerStackStore = {
+  stacks: TrackerStack[];
+};
+
+type TrackerEntryStore = {
+  entries: TrackerEntry[];
+};
+
+const API_KEY_STORAGE = 'affiliate-api-keys.json';
+const TRACKER_STACK_STORAGE = 'tracker-stacks.json';
+const TRACKER_ENTRY_STORAGE = 'tracker-entries.json';
+const EMPTY_API_KEY_STORE: AffiliateApiKeyStore = { keys: [] };
+const EMPTY_TRACKER_STACK_STORE: TrackerStackStore = { stacks: [] };
+const EMPTY_TRACKER_ENTRY_STORE: TrackerEntryStore = { entries: [] };
+
 export async function ensureAffiliateTables() {
   const sql = await getSql();
   if (!sql) return;
@@ -136,6 +186,43 @@ export async function ensureAffiliateTables() {
       currency text NULL,
       metadata jsonb NULL,
       created_at timestamptz NOT NULL
+    );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS affiliate_api_keys (
+      id uuid PRIMARY KEY,
+      affiliate_id uuid NOT NULL,
+      api_key_hash text NOT NULL,
+      last4 text NOT NULL,
+      scopes text[] NOT NULL,
+      created_at timestamptz NOT NULL,
+      rotated_at timestamptz NULL,
+      revoked_at timestamptz NULL
+    );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS tracker_stacks (
+      id uuid PRIMARY KEY,
+      affiliate_id uuid NOT NULL,
+      name text NOT NULL,
+      notes text NULL,
+      created_at timestamptz NOT NULL,
+      updated_at timestamptz NOT NULL
+    );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS tracker_entries (
+      id uuid PRIMARY KEY,
+      stack_id uuid NOT NULL,
+      affiliate_id uuid NOT NULL,
+      date text NOT NULL,
+      dosage text NULL,
+      notes text NULL,
+      created_at timestamptz NOT NULL,
+      updated_at timestamptz NOT NULL
     );
   `;
 }
@@ -816,4 +903,322 @@ export async function notifyAffiliateAdmin(application: AffiliateApplication) {
     subject,
     text,
   });
+}
+
+// ===== Affiliate API Key Management =====
+
+function hashApiKey(key: string): string {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
+
+export async function createAffiliateApiKey(affiliateId: string): Promise<{ key: string; keyRecord: AffiliateApiKey }> {
+  const now = new Date().toISOString();
+  const rawKey = `sk_${crypto.randomBytes(32).toString('hex')}`;
+  const keyHash = hashApiKey(rawKey);
+  const last4 = rawKey.slice(-4);
+  const scopes = ['shopping_read', 'sales_read', 'assets_read', 'tracker_rw'];
+
+  const record: AffiliateApiKey = {
+    id: crypto.randomUUID(),
+    affiliateId,
+    apiKeyHash: keyHash,
+    last4,
+    scopes,
+    createdAt: now,
+  };
+
+  const sql = await getDb();
+  if (sql) {
+    await ensureAffiliateTables();
+    try {
+      await sql`
+        INSERT INTO affiliate_api_keys
+        (id, affiliate_id, api_key_hash, last4, scopes, created_at)
+        VALUES
+        (${record.id}, ${affiliateId}, ${keyHash}, ${last4}, ${scopes}, ${now})
+      `;
+      return { key: rawKey, keyRecord: record };
+    } catch (dbError) {
+      console.error('API key creation DB failed, falling back to file storage', dbError);
+    }
+  }
+
+  const store = await readJson<AffiliateApiKeyStore>(API_KEY_STORAGE, EMPTY_API_KEY_STORE);
+  store.keys.unshift(record);
+  await writeJson(API_KEY_STORAGE, store);
+
+  return { key: rawKey, keyRecord: record };
+}
+
+export async function getAffiliateApiKeyByHash(hash: string): Promise<AffiliateApiKey | null> {
+  const sql = await getDb();
+  if (sql) {
+    const rows = await sql`
+      SELECT id, affiliate_id AS "affiliateId", api_key_hash AS "apiKeyHash", last4, scopes, 
+             created_at AS "createdAt", rotated_at AS "rotatedAt", revoked_at AS "revokedAt"
+      FROM affiliate_api_keys
+      WHERE api_key_hash = ${hash} AND revoked_at IS NULL
+      LIMIT 1
+    `;
+    return (rows.rows[0] as AffiliateApiKey) || null;
+  }
+
+  const store = await readJson<AffiliateApiKeyStore>(API_KEY_STORAGE, EMPTY_API_KEY_STORE);
+  return store.keys.find((k) => k.apiKeyHash === hash && !k.revokedAt) || null;
+}
+
+export async function getAffiliateApiKeyByAffiliateId(affiliateId: string): Promise<AffiliateApiKey | null> {
+  const sql = await getDb();
+  if (sql) {
+    const rows = await sql`
+      SELECT id, affiliate_id AS "affiliateId", api_key_hash AS "apiKeyHash", last4, scopes, 
+             created_at AS "createdAt", rotated_at AS "rotatedAt", revoked_at AS "revokedAt"
+      FROM affiliate_api_keys
+      WHERE affiliate_id = ${affiliateId} AND revoked_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    return (rows.rows[0] as AffiliateApiKey) || null;
+  }
+
+  const store = await readJson<AffiliateApiKeyStore>(API_KEY_STORAGE, EMPTY_API_KEY_STORE);
+  const active = store.keys.filter((k) => k.affiliateId === affiliateId && !k.revokedAt);
+  return active[active.length - 1] || null;
+}
+
+export async function revokeAffiliateApiKey(affiliateId: string): Promise<boolean> {
+  const now = new Date().toISOString();
+  const sql = await getDb();
+
+  if (sql) {
+    const result = await sql`
+      UPDATE affiliate_api_keys
+      SET revoked_at = ${now}
+      WHERE affiliate_id = ${affiliateId} AND revoked_at IS NULL
+      RETURNING id
+    `;
+    return result.rows.length > 0;
+  }
+
+  const store = await readJson<AffiliateApiKeyStore>(API_KEY_STORAGE, EMPTY_API_KEY_STORE);
+  const idx = store.keys.findIndex((k) => k.affiliateId === affiliateId && !k.revokedAt);
+  if (idx === -1) return false;
+
+  store.keys[idx].revokedAt = now;
+  await writeJson(API_KEY_STORAGE, store);
+  return true;
+}
+
+// ===== Tracker Stacks =====
+
+export async function createTrackerStack(affiliateId: string, name: string, notes?: string): Promise<TrackerStack> {
+  const now = new Date().toISOString();
+  const record: TrackerStack = {
+    id: crypto.randomUUID(),
+    affiliateId,
+    name,
+    notes: notes || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const sql = await getDb();
+  if (sql) {
+    await ensureAffiliateTables();
+    try {
+      await sql`
+        INSERT INTO tracker_stacks (id, affiliate_id, name, notes, created_at, updated_at)
+        VALUES (${record.id}, ${affiliateId}, ${name}, ${notes || null}, ${now}, ${now})
+      `;
+      return record;
+    } catch (dbError) {
+      console.error('Tracker stack creation DB failed, falling back to file storage', dbError);
+    }
+  }
+
+  const store = await readJson<TrackerStackStore>(TRACKER_STACK_STORAGE, EMPTY_TRACKER_STACK_STORE);
+  store.stacks.unshift(record);
+  await writeJson(TRACKER_STACK_STORAGE, store);
+
+  return record;
+}
+
+export async function getTrackerStacks(affiliateId: string): Promise<TrackerStack[]> {
+  const sql = await getDb();
+  if (sql) {
+    const rows = await sql`
+      SELECT id, affiliate_id AS "affiliateId", name, notes, created_at AS "createdAt", updated_at AS "updatedAt"
+      FROM tracker_stacks
+      WHERE affiliate_id = ${affiliateId}
+      ORDER BY created_at DESC
+    `;
+    return rows.rows as TrackerStack[];
+  }
+
+  const store = await readJson<TrackerStackStore>(TRACKER_STACK_STORAGE, EMPTY_TRACKER_STACK_STORE);
+  return store.stacks.filter((s) => s.affiliateId === affiliateId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function updateTrackerStack(stackId: string, affiliateId: string, updates: { name?: string; notes?: string }): Promise<TrackerStack | null> {
+  const now = new Date().toISOString();
+  const sql = await getDb();
+
+  if (sql) {
+    const result = await sql`
+      UPDATE tracker_stacks
+      SET name = COALESCE(${updates.name || null}, name),
+          notes = COALESCE(${updates.notes || null}, notes),
+          updated_at = ${now}
+      WHERE id = ${stackId} AND affiliate_id = ${affiliateId}
+      RETURNING id, affiliate_id AS "affiliateId", name, notes, created_at AS "createdAt", updated_at AS "updatedAt"
+    `;
+    return (result.rows[0] as TrackerStack) || null;
+  }
+
+  const store = await readJson<TrackerStackStore>(TRACKER_STACK_STORAGE, EMPTY_TRACKER_STACK_STORE);
+  const idx = store.stacks.findIndex((s) => s.id === stackId && s.affiliateId === affiliateId);
+  if (idx === -1) return null;
+
+  if (updates.name) store.stacks[idx].name = updates.name;
+  if (updates.notes !== undefined) store.stacks[idx].notes = updates.notes;
+  store.stacks[idx].updatedAt = now;
+
+  await writeJson(TRACKER_STACK_STORAGE, store);
+  return store.stacks[idx];
+}
+
+export async function deleteTrackerStack(stackId: string, affiliateId: string): Promise<boolean> {
+  const sql = await getDb();
+
+  if (sql) {
+    const result = await sql`
+      DELETE FROM tracker_stacks
+      WHERE id = ${stackId} AND affiliate_id = ${affiliateId}
+    `;
+    return result.count > 0;
+  }
+
+  const store = await readJson<TrackerStackStore>(TRACKER_STACK_STORAGE, EMPTY_TRACKER_STACK_STORE);
+  const idx = store.stacks.findIndex((s) => s.id === stackId && s.affiliateId === affiliateId);
+  if (idx === -1) return false;
+
+  store.stacks.splice(idx, 1);
+  await writeJson(TRACKER_STACK_STORAGE, store);
+  return true;
+}
+
+// ===== Tracker Entries =====
+
+export async function createTrackerEntry(
+  stackId: string,
+  affiliateId: string,
+  date: string,
+  dosage?: string,
+  notes?: string
+): Promise<TrackerEntry> {
+  const now = new Date().toISOString();
+  const record: TrackerEntry = {
+    id: crypto.randomUUID(),
+    stackId,
+    affiliateId,
+    date,
+    dosage: dosage || null,
+    notes: notes || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const sql = await getDb();
+  if (sql) {
+    await ensureAffiliateTables();
+    try {
+      await sql`
+        INSERT INTO tracker_entries (id, stack_id, affiliate_id, date, dosage, notes, created_at, updated_at)
+        VALUES (${record.id}, ${stackId}, ${affiliateId}, ${date}, ${dosage || null}, ${notes || null}, ${now}, ${now})
+      `;
+      return record;
+    } catch (dbError) {
+      console.error('Tracker entry creation DB failed, falling back to file storage', dbError);
+    }
+  }
+
+  const store = await readJson<TrackerEntryStore>(TRACKER_ENTRY_STORAGE, EMPTY_TRACKER_ENTRY_STORE);
+  store.entries.unshift(record);
+  await writeJson(TRACKER_ENTRY_STORAGE, store);
+
+  return record;
+}
+
+export async function getTrackerEntries(stackId: string, affiliateId: string): Promise<TrackerEntry[]> {
+  const sql = await getDb();
+  if (sql) {
+    const rows = await sql`
+      SELECT id, stack_id AS "stackId", affiliate_id AS "affiliateId", date, dosage, notes, 
+             created_at AS "createdAt", updated_at AS "updatedAt"
+      FROM tracker_entries
+      WHERE stack_id = ${stackId} AND affiliate_id = ${affiliateId}
+      ORDER BY date DESC
+    `;
+    return rows.rows as TrackerEntry[];
+  }
+
+  const store = await readJson<TrackerEntryStore>(TRACKER_ENTRY_STORAGE, EMPTY_TRACKER_ENTRY_STORE);
+  return store.entries
+    .filter((e) => e.stackId === stackId && e.affiliateId === affiliateId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+export async function updateTrackerEntry(
+  entryId: string,
+  affiliateId: string,
+  updates: { date?: string; dosage?: string; notes?: string }
+): Promise<TrackerEntry | null> {
+  const now = new Date().toISOString();
+  const sql = await getDb();
+
+  if (sql) {
+    const result = await sql`
+      UPDATE tracker_entries
+      SET date = COALESCE(${updates.date || null}, date),
+          dosage = COALESCE(${updates.dosage || null}, dosage),
+          notes = COALESCE(${updates.notes || null}, notes),
+          updated_at = ${now}
+      WHERE id = ${entryId} AND affiliate_id = ${affiliateId}
+      RETURNING id, stack_id AS "stackId", affiliate_id AS "affiliateId", date, dosage, notes, 
+                created_at AS "createdAt", updated_at AS "updatedAt"
+    `;
+    return (result.rows[0] as TrackerEntry) || null;
+  }
+
+  const store = await readJson<TrackerEntryStore>(TRACKER_ENTRY_STORAGE, EMPTY_TRACKER_ENTRY_STORE);
+  const idx = store.entries.findIndex((e) => e.id === entryId && e.affiliateId === affiliateId);
+  if (idx === -1) return null;
+
+  if (updates.date) store.entries[idx].date = updates.date;
+  if (updates.dosage !== undefined) store.entries[idx].dosage = updates.dosage;
+  if (updates.notes !== undefined) store.entries[idx].notes = updates.notes;
+  store.entries[idx].updatedAt = now;
+
+  await writeJson(TRACKER_ENTRY_STORAGE, store);
+  return store.entries[idx];
+}
+
+export async function deleteTrackerEntry(entryId: string, affiliateId: string): Promise<boolean> {
+  const sql = await getDb();
+
+  if (sql) {
+    const result = await sql`
+      DELETE FROM tracker_entries
+      WHERE id = ${entryId} AND affiliate_id = ${affiliateId}
+    `;
+    return result.count > 0;
+  }
+
+  const store = await readJson<TrackerEntryStore>(TRACKER_ENTRY_STORAGE, EMPTY_TRACKER_ENTRY_STORE);
+  const idx = store.entries.findIndex((e) => e.id === entryId && e.affiliateId === affiliateId);
+  if (idx === -1) return false;
+
+  store.entries.splice(idx, 1);
+  await writeJson(TRACKER_ENTRY_STORAGE, store);
+  return true;
 }
