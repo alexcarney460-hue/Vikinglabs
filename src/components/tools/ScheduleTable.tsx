@@ -1,6 +1,6 @@
 'use client';
 
-import { type ScheduleEntry, simplifySchedule } from '@/lib/stackOptimizer/generateSchedule';
+import { type ScheduleEntry, type SimplifiedScheduleEntry, simplifySchedule } from '@/lib/stackOptimizer/generateSchedule';
 
 interface ScheduleTableProps {
   entries: ScheduleEntry[];
@@ -8,8 +8,6 @@ interface ScheduleTableProps {
 }
 
 export default function ScheduleTable({ entries, simplified = false }: ScheduleTableProps) {
-  const displayEntries = simplified ? simplifySchedule(entries) : entries;
-
   if (entries.length === 0) {
     return (
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-600">
@@ -19,6 +17,7 @@ export default function ScheduleTable({ entries, simplified = false }: ScheduleT
   }
 
   if (simplified) {
+    const simplifiedEntries: SimplifiedScheduleEntry[] = simplifySchedule(entries);
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -30,7 +29,7 @@ export default function ScheduleTable({ entries, simplified = false }: ScheduleT
             </tr>
           </thead>
           <tbody>
-            {displayEntries.map((entry, idx) => (
+            {simplifiedEntries.map((entry, idx) => (
               <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-slate-900">{entry.dateRange}</td>
                 <td className="px-4 py-3 text-slate-600">
