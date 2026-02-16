@@ -26,23 +26,28 @@ export default function AffiliateDashboard() {
   const [payouts, setPayouts] = useState<AffiliatePayout[]>([]);
   const [toolkit, setToolkit] = useState<Toolkit | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit' | 'api-keys'>('overview');
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [summaryRes, conversionsRes, payoutsRes, toolkitRes] = await Promise.all([
+        const [summaryRes, conversionsRes, payoutsRes, toolkitRes, keysRes] = await Promise.all([
           fetch('/api/affiliate/summary'),
           fetch('/api/affiliate/conversions?limit=20'),
           fetch('/api/affiliate/payouts?limit=10'),
           fetch('/api/affiliate/toolkit'),
+          fetch('/api/affiliate/keys'),
         ]);
 
         if (summaryRes.ok) setSummary((await summaryRes.json()).summary);
         if (conversionsRes.ok) setConversions((await conversionsRes.json()).conversions);
         if (payoutsRes.ok) setPayouts((await payoutsRes.json()).payouts);
         if (toolkitRes.ok) setToolkit((await toolkitRes.json()).toolkit);
+        if (keysRes.ok) setApiKeys((await keysRes.json()).keys || []);
       } catch (error) {
         console.error('[AffiliateDashboard] Error fetching data:', error);
       } finally {
@@ -82,12 +87,12 @@ export default function AffiliateDashboard() {
   return (
     <div className="space-y-8">
       {/* Tab Navigation */}
-      <div className="flex border-b border-slate-200">
-        {(['overview', 'conversions', 'payouts', 'toolkit'] as const).map((tab) => (
+      <div className="flex border-b border-slate-200 overflow-x-auto">
+        {(['overview', 'conversions', 'payouts', 'toolkit', 'api-keys'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors ${
+            className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors whitespace-nowrap ${
               activeTab === tab
                 ? 'border-b-2 border-amber-500 text-amber-600'
                 : 'text-slate-600 hover:text-slate-900'
@@ -97,6 +102,7 @@ export default function AffiliateDashboard() {
             {tab === 'conversions' && '📈 Conversions'}
             {tab === 'payouts' && '💰 Payouts'}
             {tab === 'toolkit' && '🛠️ Toolkit'}
+            {tab === 'api-keys' && '🔑 API Keys'}
           </button>
         ))}
       </div>
@@ -368,6 +374,107 @@ export default function AffiliateDashboard() {
               </div>
             </>
           )}
+
+      {/* API Keys Tab */}
+      {activeTab === 'api-keys' && (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">API Keys</h3>
+                <p className="mt-2 text-sm text-slate-600">Create and manage API keys for accessing affiliate resources programmatically.</p>
+              </div>
+            </div>
+
+            {/* Create Key Form */}
+            <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-6">
+              <h4 className="font-bold text-slate-900">Create New Key</h4>
+              <div className="mt-4 flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Key name (e.g., 'Dashboard', 'Integrations')"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <button
+                  onClick={async () => {
+                    if (!newKeyName.trim()) return;
+                    setCreatingKey(true);
+                    try {
+                      const res = await fetch('/api/affiliate/keys', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newKeyName }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setApiKeys([...apiKeys, data.key]);
+                        setNewKeyName('');
+                        alert(`Key created! Store it safely:\n\n${data.key.secret}\n\nYou won't be able to see it again.`);
+                      }
+                    } finally {
+                      setCreatingKey(false);
+                    }
+                  }}
+                  disabled={creatingKey || !newKeyName.trim()}
+                  className="rounded-lg bg-amber-500 px-6 py-2 font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {creatingKey ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+            </div>
+
+            {/* Keys List */}
+            {apiKeys.length === 0 ? (
+              <p className="text-sm text-slate-600">No API keys yet. Create one to get started.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase text-slate-600">Your Keys ({apiKeys.length})</p>
+                {apiKeys.map((key, idx) => (
+                  <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                      <p className="font-semibold text-slate-900">{key.name || 'Unnamed'}</p>
+                      <p className="text-xs text-slate-500">ID: {key.id.slice(0, 12)}…</p>
+                      <p className="text-xs text-slate-500">Created: {new Date(key.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Revoke this key? It cannot be undone.')) return;
+                        try {
+                          const res = await fetch(`/api/affiliate/keys/${key.id}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            setApiKeys(apiKeys.filter((k) => k.id !== key.id));
+                          }
+                        } catch (err) {
+                          console.error('Error revoking key:', err);
+                        }
+                      }}
+                      className="rounded-lg bg-red-100 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-200"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Usage Info */}
+            <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-6">
+              <h4 className="font-bold text-slate-900">API Documentation</h4>
+              <p className="mt-2 text-sm text-slate-600">
+                Use your API key as Bearer token in the Authorization header:
+              </p>
+              <code className="mt-4 block rounded-lg bg-slate-800 px-4 py-3 text-xs font-mono text-slate-100 overflow-x-auto">
+                Authorization: Bearer &lt;your_api_key&gt;
+              </code>
+              <p className="mt-4 text-sm text-slate-600">
+                Endpoints: <code className="bg-slate-200 px-2 py-1 rounded text-xs font-mono">/api/affiliate/summary</code>, 
+                <code className="bg-slate-200 px-2 py-1 rounded text-xs font-mono ml-2">/api/affiliate/conversions</code>,
+                <code className="bg-slate-200 px-2 py-1 rounded text-xs font-mono ml-2">/api/affiliate/toolkit</code>
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>
