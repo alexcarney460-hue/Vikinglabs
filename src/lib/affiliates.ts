@@ -1538,37 +1538,100 @@ export async function sendWelcomeEmail(affiliate: AffiliateApplication): Promise
   const referralUrl = `${siteUrl}/r/${affiliate.code}`;
   const dashboardUrl = `${siteUrl}/account`;
 
-  const subject = `Welcome to the Viking Labs Affiliate Program!`;
-  const text = `Hi ${affiliate.name},\n\nWelcome to the Viking Labs Affiliate Program! We're thrilled to have you on board.\n\nHere are your details:\n- Affiliate Code: ${affiliate.code}\n- Your Referral Link: ${referralUrl}\n- Commission Rate: ${commissionPct}%\n- Your Dashboard: ${dashboardUrl} (click the Affiliate Dashboard tab)\n\nHow it works:\n1. Share your referral link with your audience\n2. When someone makes a purchase through your link, you earn ${commissionPct}% commission\n3. Track your clicks, sales, and earnings in your dashboard\n\nIf you have any questions, just reply to this email.\n\nBest regards,\nViking Labs Team`;
+  const firstName = affiliate.name.split(' ')[0] || affiliate.name;
+
+  const subject = `Welcome to Viking Labs — You're In`;
+  const text = `Hi ${firstName},
+
+Welcome to Viking Labs. We're genuinely excited to have you join us as an approved affiliate and to begin this new business partnership together.
+
+Viking Labs was built around a simple idea: provide serious, research-focused peptide products with the level of quality, presentation, and credibility the community deserves. We're glad to have partners who share that mindset.
+
+Our brand is rooted in precision, transparency, and respect for the scientific and research communities we serve. Peptides and research compounds sit at the frontier of innovation, and the conversations you help create play a meaningful role in that ecosystem. We see this as more than promotion — it's collaboration.
+
+Your Affiliate Details:
+- Affiliate Code: ${affiliate.code}
+- Referral Link: ${referralUrl}
+- Commission Rate: ${commissionPct}%
+
+Inside your Viking Labs profile, you now have access to your Affiliate Dashboard. There you'll find:
+• Real-time performance tracking
+• Commission and sales reporting
+• Your personal referral tools
+• The Viking Labs Toolkit
+
+You also have access to our affiliate API endpoints directly from your profile, allowing you to integrate or monitor shopping activity, sales data, payment statistics, and overall performance tracking within your own workflows or tools if desired.
+
+The toolkit was designed to make your content creation easier and consistent with our visual identity — clean, laboratory-grade, and credible. Whether you're building educational content, social posts, or long-form material, you'll have brand-aligned assets ready to use.
+
+We're looking forward to building something long-term, professional, and mutually beneficial. If you ever need clarification, assets, or support, simply reach out — we're here to help you succeed.
+
+Welcome aboard.
+
+William Carney
+Viking Labs`;
 
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h2 style="color: #1e293b;">Welcome to Viking Labs, ${affiliate.name}! 🎉</h2>
-      <p>We're thrilled to have you in our affiliate program.</p>
+    <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 40px 24px; color: #1e293b; line-height: 1.7;">
       
-      <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0;">
-        <p style="margin: 0 0 8px; font-size: 14px; color: #64748b;">Your Affiliate Code</p>
-        <p style="margin: 0; font-size: 24px; font-weight: bold; color: #1e293b;">${affiliate.code}</p>
+      <p style="font-size: 16px;">Hi ${firstName},</p>
+      
+      <p style="font-size: 15px; color: #334155;">Welcome to Viking Labs. We're genuinely excited to have you join us as an approved affiliate and to begin this new business partnership together.</p>
+      
+      <p style="font-size: 15px; color: #334155;">Viking Labs was built around a simple idea: provide serious, research-focused peptide products with the level of quality, presentation, and credibility the community deserves. We're glad to have partners who share that mindset.</p>
+      
+      <p style="font-size: 15px; color: #334155;">Our brand is rooted in precision, transparency, and respect for the scientific and research communities we serve. Peptides and research compounds sit at the frontier of innovation, and the conversations you help create play a meaningful role in that ecosystem. We see this as more than promotion — it's collaboration.</p>
+      
+      <!-- Affiliate Details Card -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 32px 0;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0;">
+              <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">Affiliate Code</span><br>
+              <span style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: 0.02em;">${affiliate.code}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-top: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">Referral Link</span><br>
+              <a href="${referralUrl}" style="font-size: 15px; color: #2563eb; text-decoration: none; font-weight: 600;">${referralUrl}</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-top: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">Commission Rate</span><br>
+              <span style="font-size: 20px; font-weight: 800; color: #0f172a;">${commissionPct}%</span>
+            </td>
+          </tr>
+        </table>
       </div>
       
-      <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 24px 0;">
-        <p style="margin: 0 0 8px; font-size: 14px; color: #1e40af;">Commission Rate</p>
-        <p style="margin: 0; font-size: 20px; font-weight: bold; color: #1e40af;">${commissionPct}%</p>
+      <p style="font-size: 15px; color: #334155;">Inside your Viking Labs profile, you now have access to your <strong>Affiliate Dashboard</strong>. There you'll find:</p>
+      
+      <ul style="font-size: 15px; color: #334155; padding-left: 20px;">
+        <li style="margin-bottom: 6px;">Real-time performance tracking</li>
+        <li style="margin-bottom: 6px;">Commission and sales reporting</li>
+        <li style="margin-bottom: 6px;">Your personal referral tools</li>
+        <li style="margin-bottom: 6px;">The Viking Labs Toolkit</li>
+      </ul>
+      
+      <p style="font-size: 15px; color: #334155;">You also have access to our affiliate API endpoints directly from your profile, allowing you to integrate or monitor shopping activity, sales data, payment statistics, and overall performance tracking within your own workflows or tools if desired.</p>
+      
+      <p style="font-size: 15px; color: #334155;">The toolkit was designed to make your content creation easier and consistent with our visual identity — clean, laboratory-grade, and credible. Whether you're building educational content, social posts, or long-form material, you'll have brand-aligned assets ready to use.</p>
+      
+      <div style="margin: 32px 0; text-align: center;">
+        <a href="${dashboardUrl}" style="display: inline-block; background: #0f172a; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; letter-spacing: 0.03em;">Open Your Dashboard</a>
       </div>
       
-      <h3>How It Works</h3>
-      <ol style="line-height: 1.8; color: #475569;">
-        <li>Share your referral link: <a href="${referralUrl}">${referralUrl}</a></li>
-        <li>Earn ${commissionPct}% on every purchase made through your link</li>
-        <li>Track everything in your <a href="${dashboardUrl}">affiliate dashboard</a></li>
-      </ol>
+      <p style="font-size: 15px; color: #334155;">We're looking forward to building something long-term, professional, and mutually beneficial. If you ever need clarification, assets, or support, simply reach out — we're here to help you succeed.</p>
       
-      <div style="margin: 32px 0;">
-        <a href="${dashboardUrl}" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Go to Your Dashboard</a>
-      </div>
+      <p style="font-size: 15px; color: #334155;">Welcome aboard.</p>
       
-      <p style="color: #64748b; font-size: 14px;">Questions? Just reply to this email.</p>
-      <p style="color: #64748b; font-size: 14px;">Best regards,<br><strong>Viking Labs Team</strong></p>
+      <p style="font-size: 15px; color: #1e293b; margin-top: 32px;">
+        <strong>William Carney</strong><br>
+        <span style="color: #64748b;">Viking Labs</span>
+      </p>
+      
     </div>
   `;
 
