@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AffiliateSummary, AffiliateConversion, AffiliatePayout } from '@/lib/affiliates';
+import { AffiliateSummary, AffiliateConversion, AffiliatePayout, AffiliateApiKey } from '@/lib/affiliates';
 import PartnerAgreement from './PartnerAgreement';
 
 type ToolkitTemplate = {
@@ -26,12 +26,13 @@ export default function AffiliateDashboard() {
   const [conversions, setConversions] = useState<AffiliateConversion[]>([]);
   const [payouts, setPayouts] = useState<AffiliatePayout[]>([]);
   const [toolkit, setToolkit] = useState<Toolkit | null>(null);
-  const [apiKeys, setApiKeys] = useState<any[]>([]);
+  const [apiKeys, setApiKeys] = useState<AffiliateApiKey[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit' | 'agreement' | 'api-keys'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit' | 'api-keys' | 'agreement'>('overview');
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
-  const [newKeyName, setNewKeyName] = useState('');
-  const [creatingKey, setCreatingKey] = useState(false);
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
+  const [newKeyModal, setNewKeyModal] = useState<{ key: string; last4: string; createdAt: string } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,7 +49,10 @@ export default function AffiliateDashboard() {
         if (conversionsRes.ok) setConversions((await conversionsRes.json()).conversions);
         if (payoutsRes.ok) setPayouts((await payoutsRes.json()).payouts);
         if (toolkitRes.ok) setToolkit((await toolkitRes.json()).toolkit);
-        if (keysRes.ok) setApiKeys((await keysRes.json()).keys || []);
+        if (keysRes.ok) {
+          const data = await keysRes.json();
+          setApiKeys(data.keys || []);
+        }
       } catch (error) {
         console.error('[AffiliateDashboard] Error fetching data:', error);
       } finally {
@@ -64,6 +68,58 @@ export default function AffiliateDashboard() {
       setCopiedRef(ref);
       setTimeout(() => setCopiedRef(null), 1500);
     });
+  }
+
+  async function generateNewApiKey() {
+    setGeneratingKey(true);
+    try {
+      const res = await fetch('/api/affiliate/keys', { method: 'POST' });
+      if (!res.ok) {
+        alert('Failed to generate API key');
+        return;
+      }
+      const data = await res.json();
+      setNewKeyModal({
+        key: data.key,
+        last4: data.keyRecord.last4,
+        createdAt: data.keyRecord.createdAt,
+      });
+      // Refresh API keys list
+      const keysRes = await fetch('/api/affiliate/keys');
+      if (keysRes.ok) {
+        const keysData = await keysRes.json();
+        setApiKeys(keysData.keys || []);
+      }
+    } catch (error) {
+      console.error('[AffiliateDashboard] Error generating API key:', error);
+      alert('Error generating API key');
+    } finally {
+      setGeneratingKey(false);
+    }
+  }
+
+  async function revokeApiKey(keyId: string) {
+    if (!confirm('Are you sure you want to revoke this API key? This cannot be undone.')) return;
+    
+    setRevokingKeyId(keyId);
+    try {
+      const res = await fetch('/api/affiliate/keys', { method: 'DELETE' });
+      if (!res.ok) {
+        alert('Failed to revoke API key');
+        return;
+      }
+      // Refresh API keys list
+      const keysRes = await fetch('/api/affiliate/keys');
+      if (keysRes.ok) {
+        const keysData = await keysRes.json();
+        setApiKeys(keysData.keys || []);
+      }
+    } catch (error) {
+      console.error('[AffiliateDashboard] Error revoking API key:', error);
+      alert('Error revoking API key');
+    } finally {
+      setRevokingKeyId(null);
+    }
   }
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -88,12 +144,12 @@ export default function AffiliateDashboard() {
   return (
     <div className="space-y-8">
       {/* Tab Navigation */}
-      <div className="flex border-b border-slate-200 overflow-x-auto">
-        {(['overview', 'conversions', 'payouts', 'toolkit', 'agreement', 'api-keys'] as const).map((tab) => (
+      <div className="flex border-b border-slate-200 flex-wrap">
+        {(['overview', 'conversions', 'payouts', 'toolkit', 'api-keys', 'agreement'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors whitespace-nowrap ${
+            className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors ${
               activeTab === tab
                 ? 'border-b-2 border-amber-500 text-amber-600'
                 : 'text-slate-600 hover:text-slate-900'
@@ -103,8 +159,8 @@ export default function AffiliateDashboard() {
             {tab === 'conversions' && '📈 Conversions'}
             {tab === 'payouts' && '💰 Payouts'}
             {tab === 'toolkit' && '🛠️ Toolkit'}
-            {tab === 'agreement' && '📋 Agreement'}
             {tab === 'api-keys' && '🔑 API Keys'}
+            {tab === 'agreement' && '📋 Partner Agreement'}
           </button>
         ))}
       </div>
@@ -112,6 +168,7 @@ export default function AffiliateDashboard() {
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="space-y-8">
+          {/* KPI Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
               label="Total Sales"
@@ -139,12 +196,14 @@ export default function AffiliateDashboard() {
             />
           </div>
 
+          {/* Last 30 Days */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Last 30 Days</h3>
             <p className="mt-2 text-3xl font-black text-slate-900">{formatCurrency(summary.last30dSalesCents)}</p>
             <p className="mt-1 text-sm text-slate-600">in attributed sales</p>
           </div>
 
+          {/* Affiliate Link & Code */}
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <label className="text-xs font-bold uppercase tracking-wide text-slate-900">Your Affiliate Code</label>
@@ -153,41 +212,48 @@ export default function AffiliateDashboard() {
                   type="text"
                   value={summary.code || ''}
                   readOnly
-                  className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 font-mono text-sm text-slate-900"
+                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-slate-900"
                 />
                 <button
                   onClick={() => copyToClipboard(summary.code || '', 'code')}
-                  className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                  className={`rounded-xl px-4 py-3 font-bold text-white transition-all ${
                     copiedRef === 'code'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-500 hover:bg-amber-600'
                   }`}
                 >
                   {copiedRef === 'code' ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
+              <p className="mt-3 text-xs text-slate-600">Share this code with your audience for trackable sales.</p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <label className="text-xs font-bold uppercase tracking-wide text-slate-900">Tracking Link</label>
+              <label className="text-xs font-bold uppercase tracking-wide text-slate-900">Your Affiliate Link</label>
               <div className="mt-4 flex items-center gap-3">
                 <input
                   type="text"
-                  value={`https://vikinglabs.co?ref=${summary.code}`}
+                  value={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co'}?ref=${summary.code || 'code'}`}
                   readOnly
-                  className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 font-mono text-sm text-slate-900"
+                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-900 overflow-hidden"
                 />
                 <button
-                  onClick={() => copyToClipboard(`https://vikinglabs.co?ref=${summary.code}`, 'link')}
-                  className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                  onClick={() =>
+                    copyToClipboard(
+                      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co'}?ref=${summary.code || 'code'}`,
+                      'link'
+                    )
+                  }
+                  className={`rounded-xl px-4 py-3 font-bold text-white transition-all ${
                     copiedRef === 'link'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-500 hover:bg-amber-600'
                   }`}
                 >
                   {copiedRef === 'link' ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
+              <p className="mt-3 text-xs text-slate-600">Direct link to the store with your referral tracking.</p>
             </div>
           </div>
         </div>
@@ -196,121 +262,288 @@ export default function AffiliateDashboard() {
       {/* Conversions Tab */}
       {activeTab === 'conversions' && (
         <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Order ID</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-600">Sale Value</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-600">Commission</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {conversions.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-600">No conversions yet</td>
-                </tr>
-              ) : (
-                conversions.map((conv, i) => (
-                  <tr key={i} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 text-sm text-slate-900">{formatDate(conv.createdAt)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600 font-mono">{conv.orderId.slice(0, 8)}…</td>
-                    <td className="px-6 py-4 text-right text-sm text-slate-900 font-semibold">{formatCurrency(conv.amountCents)}</td>
-                    <td className="px-6 py-4 text-right text-sm text-emerald-700 font-bold">{formatCurrency(conv.commissionCents)}</td>
+          <div className="p-6 border-b border-slate-200">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Recent Conversions</h3>
+            <p className="mt-1 text-slate-600">Orders attributed to your referral link or code.</p>
+          </div>
+          {conversions.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-bold text-slate-900">Date</th>
+                    <th className="px-6 py-3 text-left font-bold text-slate-900">Order ID</th>
+                    <th className="px-6 py-3 text-right font-bold text-slate-900">Amount</th>
+                    <th className="px-6 py-3 text-right font-bold text-slate-900">Commission</th>
+                    <th className="px-6 py-3 text-left font-bold text-slate-900">Status</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {conversions.map((c) => (
+                    <tr key={c.id} className="border-b border-slate-200 hover:bg-slate-50">
+                      <td className="px-6 py-4 text-slate-700">{formatDate(c.createdAt)}</td>
+                      <td className="px-6 py-4 font-mono text-slate-700">{c.orderId.slice(0, 12)}</td>
+                      <td className="px-6 py-4 text-right text-slate-700 font-bold">{formatCurrency(c.amountCents)}</td>
+                      <td className="px-6 py-4 text-right text-emerald-700 font-bold">{formatCurrency(c.commissionCents)}</td>
+                      <td className="px-6 py-4">
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                          {c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-slate-600">
+              <p>No conversions yet. Start sharing your code and link!</p>
+            </div>
+          )}
         </div>
       )}
 
       {/* Payouts Tab */}
       {activeTab === 'payouts' && (
         <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Date</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-600">Amount</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Reference</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {payouts.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-600">No payouts yet</td>
-                </tr>
-              ) : (
-                payouts.map((payout, i) => (
-                  <tr key={i} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 text-sm text-slate-900">{formatDate(payout.createdAt)}</td>
-                    <td className="px-6 py-4 text-right text-sm text-slate-900 font-semibold">{formatCurrency(payout.amountCents)}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                        payout.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {payout.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{payout.reference || '—'}</td>
+          <div className="p-6 border-b border-slate-200">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Payout History</h3>
+            <p className="mt-1 text-slate-600">Track your commission payouts and status.</p>
+          </div>
+          {payouts.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-bold text-slate-900">Date</th>
+                    <th className="px-6 py-3 text-right font-bold text-slate-900">Amount</th>
+                    <th className="px-6 py-3 text-left font-bold text-slate-900">Status</th>
+                    <th className="px-6 py-3 text-left font-bold text-slate-900">Reference</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {payouts.map((p) => (
+                    <tr key={p.id} className="border-b border-slate-200 hover:bg-slate-50">
+                      <td className="px-6 py-4 text-slate-700">{formatDate(p.createdAt)}</td>
+                      <td className="px-6 py-4 text-right font-bold text-slate-700">{formatCurrency(p.amountCents)}</td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            p.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : p.status === 'processing'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-800'
+                          }`}
+                        >
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-slate-600">{p.reference || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-slate-600">
+              <p>No payouts yet. Earn commissions and request a payout!</p>
+            </div>
+          )}
         </div>
       )}
 
       {/* Toolkit Tab */}
-      {activeTab === 'toolkit' && toolkit && (
+      {activeTab === 'toolkit' && (
         <div className="space-y-8">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Marketing Templates</h3>
-            <div className="mt-6 grid gap-6">
-              {toolkit.templates.map((template) => (
-                <div key={template.id} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-                  <div className="mb-4 flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-bold text-slate-900">{template.name}</p>
-                      <p className="mt-1 text-xs text-slate-600">{template.category}</p>
+          {toolkit && (
+            <>
+              {/* Brand Assets */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Brand Assets</h3>
+                <p className="mt-1 text-sm text-slate-600">Use these assets to promote Viking Labs professionally.</p>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  {toolkit.brandAssets.map((asset) => (
+                    <div key={asset.id} className="rounded-lg border border-slate-200 p-4">
+                      <p className="text-sm font-bold text-slate-900">{asset.name}</p>
+                      <p className="mt-1 text-xs text-slate-600">{asset.description}</p>
+                      <a
+                        href={`/${asset.filename}`}
+                        download
+                        className="mt-3 inline-block rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600"
+                      >
+                        Download
+                      </a>
                     </div>
-                    <button
-                      onClick={() => copyToClipboard(template.contentWithLink, template.id)}
-                      className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
-                        copiedRef === template.id
-                          ? 'bg-emerald-600'
-                          : 'bg-amber-500 hover:bg-amber-600'
-                      }`}
-                    >
-                      {copiedRef === template.id ? '✓ Copied' : 'Copy'}
-                    </button>
-                  </div>
-                  <p className="text-sm text-slate-700">{template.content}</p>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Copy Templates */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Copy Templates</h3>
+                <p className="mt-1 text-sm text-slate-600">Ready-made messages you can customize and share.</p>
+                <div className="mt-6 space-y-4">
+                  {toolkit.templates.map((template) => (
+                    <div key={template.id} className="rounded-lg border border-slate-200 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-slate-900">{template.name}</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{template.contentWithLink}</p>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(template.contentWithLink, template.id)}
+                          className={`rounded-lg px-4 py-2 text-xs font-bold text-white transition-all whitespace-nowrap ${
+                            copiedRef === template.id
+                              ? 'bg-emerald-600'
+                              : 'bg-amber-500 hover:bg-amber-600'
+                          }`}
+                        >
+                          {copiedRef === template.id ? '✓ Copied' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Guidelines */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Guidelines</h3>
+                <p className="mt-1 text-sm text-slate-600">Promotion best practices to keep content professional.</p>
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">✓ Do</p>
+                    <ul className="mt-3 space-y-2">
+                      {toolkit.guidelines.do.map((item: string, i: number) => (
+                        <li key={i} className="text-sm text-slate-700">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-red-700">✗ Don't</p>
+                    <ul className="mt-3 space-y-2">
+                      {toolkit.guidelines.dont.map((item: string, i: number) => (
+                        <li key={i} className="text-sm text-slate-700">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* API Keys Tab */}
+      {activeTab === 'api-keys' && (
+        <div className="space-y-6">
+          {/* New Key Modal */}
+          {newKeyModal && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-emerald-900">🔑 API Key Created</h3>
+              <p className="mt-2 text-sm text-emerald-800">Save this key now — you won't see it again!</p>
+              <div className="mt-4 rounded-lg bg-white p-4 border border-emerald-200">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-600 mb-2">Your API Key</p>
+                <code className="block text-sm font-mono text-slate-900 word-break break-all">{newKeyModal.key}</code>
+              </div>
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => {
+                    copyToClipboard(newKeyModal.key, 'new-api-key');
+                    setTimeout(() => setNewKeyModal(null), 1500);
+                  }}
+                  className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold text-white transition-all ${
+                    copiedRef === 'new-api-key'
+                      ? 'bg-emerald-600'
+                      : 'bg-emerald-500 hover:bg-emerald-600'
+                  }`}
+                >
+                  {copiedRef === 'new-api-key' ? '✓ Copied to Clipboard' : 'Copy Key'}
+                </button>
+                <button
+                  onClick={() => setNewKeyModal(null)}
+                  className="flex-1 rounded-lg bg-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-300"
+                >
+                  Done
+                </button>
+              </div>
             </div>
+          )}
+
+          {/* API Keys Section */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">API Keys</h3>
+                <p className="mt-1 text-sm text-slate-600">Manage API keys for programmatic access to affiliate data.</p>
+              </div>
+              <button
+                onClick={generateNewApiKey}
+                disabled={generatingKey}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+              >
+                {generatingKey ? '🔄 Generating...' : '➕ Generate Key'}
+              </button>
+            </div>
+
+            {apiKeys.length > 0 ? (
+              <div className="space-y-3">
+                {apiKeys.map((key) => (
+                  <div key={key.id} className="rounded-lg border border-slate-200 p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-mono font-bold text-slate-900">Key ending in <span className="text-amber-600">...{key.last4}</span></p>
+                      <p className="text-xs text-slate-600 mt-1">Created {formatDate(key.createdAt)}</p>
+                      {key.revokedAt && (
+                        <p className="text-xs text-red-600 font-semibold mt-1">Revoked {formatDate(key.revokedAt)}</p>
+                      )}
+                    </div>
+                    {!key.revokedAt && (
+                      <button
+                        onClick={() => revokeApiKey(key.id)}
+                        disabled={revokingKeyId === key.id}
+                        className="rounded-lg bg-red-100 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-200 disabled:opacity-50"
+                      >
+                        {revokingKeyId === key.id ? '🔄 Revoking...' : '🗑️ Revoke'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center">
+                <p className="text-slate-600">No API keys yet. Create one to get started.</p>
+              </div>
+            )}
           </div>
 
+          {/* API Documentation */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Guidelines</h3>
-            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900 mb-4">API Endpoints</h3>
+            <div className="space-y-4 text-sm">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">✓ Do</p>
-                <ul className="mt-3 space-y-2">
-                  {toolkit.guidelines.do.map((item: string, i: number) => (
-                    <li key={i} className="text-sm text-slate-700">• {item}</li>
-                  ))}
-                </ul>
+                <p className="font-mono font-bold text-slate-900">GET /api/affiliate/keys</p>
+                <p className="text-slate-600 mt-1">List all your API keys (only last 4 chars visible)</p>
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-red-700">✗ Don't</p>
-                <ul className="mt-3 space-y-2">
-                  {toolkit.guidelines.dont.map((item: string, i: number) => (
-                    <li key={i} className="text-sm text-slate-700">• {item}</li>
-                  ))}
-                </ul>
+                <p className="font-mono font-bold text-slate-900">POST /api/affiliate/keys</p>
+                <p className="text-slate-600 mt-1">Generate a new API key (shows full key once)</p>
+              </div>
+              <div>
+                <p className="font-mono font-bold text-slate-900">DELETE /api/affiliate/keys</p>
+                <p className="text-slate-600 mt-1">Revoke your API key</p>
+              </div>
+              <div>
+                <p className="font-mono font-bold text-slate-900">GET /api/affiliate/summary</p>
+                <p className="text-slate-600 mt-1">Get your affiliate summary and stats</p>
+              </div>
+              <div>
+                <p className="font-mono font-bold text-slate-900">GET /api/affiliate/conversions</p>
+                <p className="text-slate-600 mt-1">List recent conversions (limit, offset support)</p>
+              </div>
+              <div>
+                <p className="font-mono font-bold text-slate-900">GET /api/affiliate/payouts</p>
+                <p className="text-slate-600 mt-1">List payout history</p>
               </div>
             </div>
           </div>
@@ -318,113 +551,9 @@ export default function AffiliateDashboard() {
       )}
 
       {/* Partner Agreement Tab */}
-      {activeTab === 'agreement' && <PartnerAgreement />}
-
-      {/* API Keys Tab */}
-      {activeTab === 'api-keys' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900 mb-6">API Keys</h3>
-            <p className="text-sm text-slate-600 mb-6">Create and manage API keys for programmatic access to affiliate resources.</p>
-            
-            {/* Create Key Form */}
-            <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-6">
-              <h4 className="font-bold text-slate-900 mb-4">Create New Key</h4>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Key name (e.g., 'Dashboard', 'Server')"
-                  value={newKeyName}
-                  onChange={(e) => setNewKeyName(e.target.value)}
-                  disabled={creatingKey}
-                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-                />
-                <button
-                  onClick={async () => {
-                    if (!newKeyName.trim()) return;
-                    setCreatingKey(true);
-                    try {
-                      const res = await fetch('/api/affiliate/keys', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: newKeyName }),
-                      });
-                      const data = await res.json();
-                      if (res.ok) {
-                        setApiKeys([...apiKeys, { ...data.keyRecord, name: newKeyName }]);
-                        setNewKeyName('');
-                        alert(`Key created! Store it safely:\n\n${data.key}\n\nYou won't be able to see it again.`);
-                      } else {
-                        console.error('Create key error:', data);
-                        alert(`Error: ${data.error || 'Failed to create key'}`);
-                      }
-                    } catch (err) {
-                      console.error('Error creating key:', err);
-                      alert(`Error: ${err instanceof Error ? err.message : 'Failed to create key'}`);
-                    } finally {
-                      setCreatingKey(false);
-                    }
-                  }}
-                  disabled={creatingKey || !newKeyName.trim()}
-                  className="rounded-lg bg-amber-500 px-6 py-2 font-bold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {creatingKey ? 'Creating…' : 'Create'}
-                </button>
-              </div>
-            </div>
-
-            {/* Keys List */}
-            {apiKeys.length === 0 ? (
-              <p className="text-sm text-slate-600">No API keys yet. Create one above to get started.</p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase text-slate-600">Your Keys ({apiKeys.length})</p>
-                {apiKeys.map((key: any, idx: number) => (
-                  <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900">{key.name || 'Unnamed'}</p>
-                      <p className="text-xs text-slate-500">ID: {key.id.slice(0, 12)}…</p>
-                      <p className="text-xs text-slate-500">Created: {new Date(key.createdAt).toLocaleDateString()}</p>
-                    </div>
-                    <button 
-                      onClick={async () => {
-                        if (!confirm('Revoke this key? It cannot be undone.')) return;
-                        try {
-                          const res = await fetch(`/api/affiliate/keys/${key.id}`, { method: 'DELETE' });
-                          if (res.ok) {
-                            setApiKeys(apiKeys.filter((k) => k.id !== key.id));
-                          }
-                        } catch (err) {
-                          console.error('Error revoking key:', err);
-                        }
-                      }}
-                      className="rounded-lg bg-red-100 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-200"
-                    >
-                      Revoke
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Usage Info */}
-            <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <h4 className="font-bold text-slate-900 mb-3">Bearer Token Usage</h4>
-              <p className="text-sm text-slate-600 mb-4">
-                Include your API key as a Bearer token in the Authorization header:
-              </p>
-              <code className="block rounded-lg bg-slate-800 px-4 py-3 text-xs font-mono text-slate-100 overflow-x-auto mb-4">
-                Authorization: Bearer &lt;your_api_key&gt;
-              </code>
-              <p className="text-sm text-slate-600 mb-3">Available endpoints:</p>
-              <ul className="text-sm text-slate-600 space-y-1">
-                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/summary</code></li>
-                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/conversions</code></li>
-                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/payouts</code></li>
-                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/toolkit</code></li>
-              </ul>
-            </div>
-          </div>
+      {activeTab === 'agreement' && (
+        <div>
+          <PartnerAgreement />
         </div>
       )}
     </div>

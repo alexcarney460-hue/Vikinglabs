@@ -17,7 +17,7 @@ import { authOptions } from '@/lib/authjs/options';
 import { getAffiliateByEmail } from '@/lib/affiliates';
 import { assembleResourceKit } from '@/lib/affiliate-resources';
 import { ResourceKitResponse } from '@/../types/affiliate-resources';
-import { getUserEmail } from '@/lib/session-guards';
+import { hasUserEmail } from '@/lib/session-guards';
 
 // Force dynamic rendering for session-dependent responses
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,16 @@ export const dynamic = 'force-dynamic';
 async function validateSessionAndGetEmail(): Promise<string | null> {
   try {
     const session = await getServerSession(authOptions);
-    return getUserEmail(session);
+
+    if (!session) {
+      return null;
+    }
+
+    if (!hasUserEmail(session)) {
+      return null;
+    }
+
+    return session.user?.email ?? null;
   } catch (error) {
     console.error('[affiliate/resources] Session validation error:', error);
     return null;

@@ -5,35 +5,50 @@ import { AlertCircle, CheckCircle, TrendingUp, DollarSign, FileText } from 'luci
 
 interface AgreementData {
   agreement: {
-    tiers: {
-      name: string;
-      revenue: string;
-      commission: string;
-      benefits: string[];
-    }[];
-    sections: {
-      title: string;
-      icon: string;
-      content: string;
-    }[];
+    title: string;
+    version: string;
+    effectiveDate: string;
+    sections: Section[];
+  };
+  affiliate: {
+    id: string;
+    code: string;
+    currentTier: string;
+    commissionRate: number;
+    referredRevenue30Days: number;
   };
 }
 
+interface Section {
+  id: string;
+  title: string;
+  content?: string;
+  details?: any;
+  subsections?: Subsection[];
+}
+
+interface Subsection {
+  title: string;
+  details: any;
+}
+
 export default function PartnerAgreement() {
-  const [expanded, setExpanded] = useState<string | null>('tiers');
-  const [agreement, setAgreement] = useState<AgreementData['agreement'] | null>(null);
+  const [data, setData] = useState<AgreementData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['commission-tiers', 'payout-terms']));
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAgreement = async () => {
       try {
         const res = await fetch('/api/affiliate/agreement');
-        if (res.ok) {
-          const data = await res.json();
-          setAgreement(data.agreement);
+        if (!res.ok) {
+          throw new Error('Failed to fetch agreement');
         }
-      } catch (error) {
-        console.error('[PartnerAgreement] Error fetching agreement:', error);
+        const agreementData = await res.json();
+        setData(agreementData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
       }
@@ -42,289 +57,267 @@ export default function PartnerAgreement() {
     fetchAgreement();
   }, []);
 
+  const toggleSection = (sectionId: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(sectionId)) {
+      newExpanded.delete(sectionId);
+    } else {
+      newExpanded.add(sectionId);
+    }
+    setExpandedSections(newExpanded);
+  };
+
+  const getTierColor = (tier: string) => {
+    const colors: Record<string, string> = {
+      'Starter': 'from-blue-500 to-blue-600',
+      'Growth': 'from-purple-500 to-purple-600',
+      'Scale': 'from-orange-500 to-orange-600',
+      'Elite': 'from-amber-500 to-amber-600',
+      'Apex': 'from-red-500 to-red-600',
+    };
+    return colors[tier] || 'from-gray-500 to-gray-600';
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
   if (loading) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-        <p className="text-slate-600">Loading partner agreement…</p>
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
+          <p className="mt-4 text-gray-600">Loading partner agreement...</p>
+        </div>
       </div>
     );
   }
 
+  if (error || !data) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex gap-3">
+          <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-red-900">Unable to Load Agreement</h3>
+            <p className="text-red-800 text-sm mt-1">{error || 'Unknown error'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { agreement, affiliate } = data;
+  const tierName = affiliate.currentTier.split('-')[0].trim();
+  const gradientClass = getTierColor(tierName);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-4xl">
       {/* Header */}
-      <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 p-8">
-        <div className="flex items-center gap-3 mb-3">
-          <FileText className="w-6 h-6 text-amber-600" />
-          <h2 className="text-2xl font-bold text-amber-900">Viking Labs Partner Agreement</h2>
-        </div>
-        <p className="text-amber-800">Commission structure, benefits, and program terms</p>
-      </div>
-
-      {/* Tier Structure */}
       <div className="space-y-4">
-        <div
-          onClick={() => setExpanded(expanded === 'tiers' ? null : 'tiers')}
-          className="cursor-pointer rounded-xl border border-slate-200 hover:border-amber-300 transition-colors bg-white p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <TrendingUp className="w-5 h-5 text-amber-600" />
-              <h3 className="text-lg font-bold text-slate-900">Commission Tiers</h3>
-            </div>
-            <span className="text-slate-400 text-2xl">{expanded === 'tiers' ? '−' : '+'}</span>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{agreement.title}</h1>
+            <p className="text-gray-600 mt-1">Version {agreement.version} • Effective {agreement.effectiveDate}</p>
           </div>
+          <FileText className="h-10 w-10 text-amber-600" />
         </div>
-
-        {expanded === 'tiers' && (
-          <div className="grid gap-4">
-            {/* Tier 1 */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-1">Tier 1 — Starter Partner</h4>
-                  <p className="text-sm text-slate-600">$10,000 – $24,999 monthly referred revenue</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-amber-600">10%</div>
-                  <p className="text-xs text-slate-500">commission</p>
-                </div>
-              </div>
-              <ul className="space-y-2 text-sm text-slate-700">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Unique affiliate tracking link
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Unique partner discount code
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Standard monthly payout cycle
-                </li>
-              </ul>
-            </div>
-
-            {/* Tier 2 */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-1">Tier 2 — Growth Partner</h4>
-                  <p className="text-sm text-slate-600">$25,000 – $74,999 monthly referred revenue</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-amber-600">14%</div>
-                  <p className="text-xs text-slate-500">commission</p>
-                </div>
-              </div>
-              <ul className="space-y-2 text-sm text-slate-700">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Increased commission rate
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Eligibility for promotional incentives
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Standard monthly payout cycle
-                </li>
-              </ul>
-            </div>
-
-            {/* Tier 3 */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-1">Tier 3 — Scale Partner</h4>
-                  <p className="text-sm text-slate-600">$75,000 – $149,999 monthly referred revenue</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-amber-600">18%</div>
-                  <p className="text-xs text-slate-500">commission</p>
-                </div>
-              </div>
-              <ul className="space-y-2 text-sm text-slate-700">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Enhanced earnings structure
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Discount flexibility up to approved limits
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Eligibility for bonus campaigns
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  Standard monthly payout cycle
-                </li>
-              </ul>
-            </div>
-
-            {/* Tier 4 */}
-            <div className="rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-amber-100 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="font-bold text-amber-900 mb-1">Tier 4 — Elite Partner</h4>
-                  <p className="text-sm text-amber-700">$150,000 – $249,999 monthly referred revenue</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-amber-600">21%</div>
-                  <p className="text-xs text-amber-600">commission + NET-7 payouts</p>
-                </div>
-              </div>
-              <ul className="space-y-2 text-sm text-amber-900">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  Priority support consideration
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  Custom landing page eligibility
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  Quarterly bonus eligibility
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  Inventory priority consideration
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  NET-7 payout eligibility (subject to approval)
-                </li>
-              </ul>
-            </div>
-
-            {/* Tier 5 */}
-            <div className="rounded-xl border-2 border-amber-500 bg-gradient-to-br from-amber-100 to-amber-200 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="font-bold text-amber-950 mb-1">Tier 5 — Apex Partner</h4>
-                  <p className="text-sm text-amber-800">$250,000+ monthly referred revenue</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-amber-700">23%</div>
-                  <p className="text-xs text-amber-700">commission + NET-7 payouts</p>
-                </div>
-              </div>
-              <ul className="space-y-2 text-sm text-amber-950">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-amber-700 flex-shrink-0" />
-                  Maximum commission tier
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-amber-700 flex-shrink-0" />
-                  Custom promotional opportunities
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-amber-700 flex-shrink-0" />
-                  Exclusive campaign eligibility
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-amber-700 flex-shrink-0" />
-                  Highest payout priority
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-amber-700 flex-shrink-0" />
-                  NET-7 payout eligibility (subject to approval)
-                </li>
-              </ul>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Compliance & Abuse Prevention */}
+      {/* Current Tier Card */}
+      <div className={`bg-gradient-to-r ${gradientClass} rounded-xl p-8 text-white shadow-lg`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div>
+            <p className="text-white/80 text-sm font-medium uppercase tracking-wide">Your Tier</p>
+            <h2 className="text-3xl font-bold mt-2">{affiliate.currentTier}</h2>
+          </div>
+          <div>
+            <p className="text-white/80 text-sm font-medium uppercase tracking-wide">Commission Rate</p>
+            <div className="flex items-baseline gap-1 mt-2">
+              <span className="text-4xl font-bold">{affiliate.commissionRate}</span>
+              <span className="text-2xl">%</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-white/80 text-sm font-medium uppercase tracking-wide">30-Day Revenue</p>
+            <p className="text-3xl font-bold mt-2">{formatCurrency(affiliate.referredRevenue30Days)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tier Comparison Table */}
+      {agreement.sections.find(s => s.id === 'commission-tiers') && (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 border-b">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-amber-600" />
+              Commission Tier Structure
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Tier</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Monthly Revenue</th>
+                  <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">Commission</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Key Benefits</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agreement.sections
+                  .find(s => s.id === 'commission-tiers')
+                  ?.subsections?.map((tier, idx) => (
+                    <tr key={idx} className="border-b hover:bg-gray-50 transition">
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-gray-900">{tier.title}</span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 text-sm">{tier.details.monthlyRevenue}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-block bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold">
+                          {tier.details.commissionRate}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {tier.details.benefits?.slice(0, 2).join(' • ')}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Agreement Sections */}
       <div className="space-y-4">
-        <div
-          onClick={() => setExpanded(expanded === 'compliance' ? null : 'compliance')}
-          className="cursor-pointer rounded-xl border border-slate-200 hover:border-red-300 transition-colors bg-white p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              <h3 className="text-lg font-bold text-slate-900">Compliance & Abuse Prevention</h3>
-            </div>
-            <span className="text-slate-400 text-2xl">{expanded === 'compliance' ? '−' : '+'}</span>
-          </div>
-        </div>
+        {agreement.sections.map((section) => (
+          <div key={section.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleSection(section.id)}
+              className="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition text-left flex items-center justify-between group"
+            >
+              <h3 className="font-semibold text-gray-900 group-hover:text-amber-600 transition">
+                {section.title}
+              </h3>
+              <svg
+                className={`h-5 w-5 text-gray-600 transition-transform ${
+                  expandedSections.has(section.id) ? 'rotate-180' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+            </button>
 
-        {expanded === 'compliance' && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-4">
-            <div>
-              <h4 className="font-bold text-red-900 mb-2">Prohibited Activities</h4>
-              <ul className="space-y-1 text-sm text-red-800">
-                <li>• Self-referrals or indirect self-purchases</li>
-                <li>• Misleading or deceptive promotions</li>
-                <li>• Unauthorized advertising methods</li>
-                <li>• Fraudulent transactions</li>
-                <li>• Artificial traffic generation</li>
-                <li>• Misrepresentation of products or policies</li>
-              </ul>
-            </div>
+            {expandedSections.has(section.id) && (
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 space-y-4">
+                {section.content && <p className="text-gray-700">{section.content}</p>}
 
-            <div className="pt-4 border-t border-red-200">
-              <h4 className="font-bold text-red-900 mb-2">Suspension & Termination</h4>
-              <p className="text-sm text-red-800">
-                Viking Labs may suspend or terminate participation at any time for fraud, policy violations, brand protection concerns, or unacceptable promotional practices. Unpaid commissions may be forfeited at Viking Labs discretion.
-              </p>
-            </div>
+                {section.details && (
+                  <div className="space-y-2">
+                    {typeof section.details === 'string' ? (
+                      <p className="text-gray-700">{section.details}</p>
+                    ) : Array.isArray(section.details) ? (
+                      <ul className="space-y-2">
+                        {section.details.map((item, idx) => (
+                          <li key={idx} className="flex gap-3">
+                            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-gray-700">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="bg-white rounded p-4 space-y-2">
+                        {Object.entries(section.details).map(([key, value]) => (
+                          <div key={key}>
+                            <p className="text-sm font-semibold text-gray-900 capitalize">{key}:</p>
+                            {typeof value === 'string' ? (
+                              <p className="text-gray-700 text-sm">{value}</p>
+                            ) : Array.isArray(value) ? (
+                              <ul className="space-y-1 mt-1">
+                                {value.map((item, idx) => (
+                                  <li key={idx} className="text-gray-700 text-sm ml-4">
+                                    • {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-gray-700 text-sm">{JSON.stringify(value)}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {section.subsections && section.subsections.length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    {section.subsections.map((subsection, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-4 border border-gray-200">
+                        <h4 className="font-semibold text-gray-900 mb-2">{subsection.title}</h4>
+                        {typeof subsection.details === 'string' ? (
+                          <p className="text-gray-700 text-sm">{subsection.details}</p>
+                        ) : Array.isArray(subsection.details) ? (
+                          <ul className="space-y-1">
+                            {subsection.details.map((item, i) => (
+                              <li key={i} className="text-gray-700 text-sm flex gap-2">
+                                <span className="text-amber-600">•</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="space-y-1 text-sm">
+                            {Object.entries(subsection.details).map(([key, val]) => (
+                              <div key={key}>
+                                <p className="font-semibold text-gray-900 capitalize text-xs">{key}:</p>
+                                {typeof val === 'string' ? (
+                                  <p className="text-gray-700">{val}</p>
+                                ) : Array.isArray(val) ? (
+                                  <ul className="ml-4 space-y-0.5">
+                                    {val.map((v, i) => (
+                                      <li key={i} className="text-gray-700">
+                                        • {v}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-gray-700">{JSON.stringify(val)}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        )}
+        ))}
       </div>
 
-      {/* Program Terms */}
-      <div className="space-y-4">
-        <div
-          onClick={() => setExpanded(expanded === 'terms' ? null : 'terms')}
-          className="cursor-pointer rounded-xl border border-slate-200 hover:border-blue-300 transition-colors bg-white p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <DollarSign className="w-5 h-5 text-blue-600" />
-              <h3 className="text-lg font-bold text-slate-900">Payout Terms & Program Authority</h3>
-            </div>
-            <span className="text-slate-400 text-2xl">{expanded === 'terms' ? '−' : '+'}</span>
+      {/* Footer */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+        <div className="flex gap-3">
+          <CheckCircle className="h-6 w-6 text-amber-600 flex-shrink-0" />
+          <div>
+            <h4 className="font-semibold text-amber-900">You're an Approved Partner</h4>
+            <p className="text-amber-800 text-sm mt-1">
+              By participating in the Viking Labs Partner Program, you agree to the terms outlined above. For questions, contact support@vikinglabs.co.
+            </p>
           </div>
         </div>
-
-        {expanded === 'terms' && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 space-y-4">
-            <div>
-              <h4 className="font-bold text-blue-900 mb-2">Standard Payout Cycle</h4>
-              <p className="text-sm text-blue-800 mb-2">Monthly cycle with payment issued within 30 days of month-end via verified payment method.</p>
-              <p className="text-sm text-blue-800">Minimum payout threshold: $50 USD. Commissions below this may be held and carried forward.</p>
-            </div>
-
-            <div className="pt-4 border-t border-blue-200">
-              <h4 className="font-bold text-blue-900 mb-2">NET-7 Payout Eligibility</h4>
-              <p className="text-sm text-blue-800">
-                Elite (Tier 4) and Apex (Tier 5) partners are eligible for accelerated NET-7 payouts upon approval. This requires account standing review, traffic quality validation, and fraud-risk assessment. NET-7 payouts may be revoked for policy violations.
-              </p>
-            </div>
-
-            <div className="pt-4 border-t border-blue-200">
-              <h4 className="font-bold text-blue-900 mb-2">Viking Labs Authority</h4>
-              <p className="text-sm text-blue-800">
-                Viking Labs maintains sole authority over attribution decisions, commission calculations, fraud determinations, policy enforcement, and program interpretation. All decisions are final.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Footer Notice */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-        <p className="text-sm text-slate-600">
-          <strong>Agreement Version 1.0</strong> — Participation in the Viking Labs Partner Program constitutes acceptance of these terms. Viking Labs reserves the right to modify commission rates, tier thresholds, program rules, and partner benefits. Continued participation constitutes acceptance of updates.
-        </p>
       </div>
     </div>
   );

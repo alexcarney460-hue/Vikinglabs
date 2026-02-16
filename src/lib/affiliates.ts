@@ -333,10 +333,10 @@ export async function listAffiliateApplications(status?: AffiliateStatus): Promi
   if (supabase) {
     await ensureAffiliateTables();
     try {
-      const query = supabase.from('affiliate_applications').select('*').order('created_at', { ascending: false });
+      let query = supabase.from('affiliate_applications').select('*').order('created_at', { ascending: false });
       
       if (status) {
-        query.eq('status', status);
+        query = query.eq('status', status);
       }
 
       const { data, error } = await query;
