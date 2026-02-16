@@ -12,13 +12,15 @@ export const metadata = {
 export default async function AffiliateDashboardPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.email) {
+  if (!session || !session.user || !session.user.email) {
     redirect('/account/login');
   }
 
+  const userEmail: string = session.user.email;
+
   // Check if user is an approved affiliate
   const allAffiliates = await listAffiliateApplications('approved');
-  const affiliate = allAffiliates.find((a) => a.email === session.user.email);
+  const affiliate = allAffiliates.find((a) => a.email === userEmail);
 
   if (!affiliate) {
     return (
@@ -49,3 +51,4 @@ export default async function AffiliateDashboardPage() {
     </div>
   );
 }
+

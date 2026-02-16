@@ -47,12 +47,13 @@ export async function GET(request: NextRequest) {
     // Fall back to session auth
     if (!affiliateId) {
       const session = await getServerSession(authOptions);
-      if (!session?.user?.email) {
+      if (!session || !session.user || !session.user.email) {
         return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
       }
 
+      const userEmail: string = session.user.email;
       const allAffiliates = await listAffiliateApplications('approved');
-      const affiliate = allAffiliates.find((a) => a.email === session.user.email);
+      const affiliate = allAffiliates.find((a) => a.email === userEmail);
 
       if (!affiliate) {
         return NextResponse.json(
@@ -93,3 +94,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+

@@ -6,7 +6,6 @@ import {
   getAffiliateApiKeyByHash,
   listAffiliateStats,
 } from '@/lib/affiliates';
-import { getSql, hasPooledDatabase } from '@/lib/db';
 
 function extractApiKey(authHeader?: string): string | null {
   if (!authHeader) return null;
@@ -47,12 +46,13 @@ export async function GET(request: NextRequest) {
     // Fall back to session auth
     if (!affiliateId) {
       const session = await getServerSession(authOptions);
-      if (!session?.user?.email) {
+      if (!session || !session.user || !session.user.email) {
         return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
       }
 
+      const userEmail: string = session.user.email;
       const allAffiliates = await listAffiliateApplications('approved');
-      const affiliate = allAffiliates.find((a) => a.email === session.user.email);
+      const affiliate = allAffiliates.find((a) => a.email === userEmail);
 
       if (!affiliate) {
         return NextResponse.json(
@@ -67,34 +67,6 @@ export async function GET(request: NextRequest) {
     // Get stats
     const stats = await listAffiliateStats([affiliateId]);
     const stat = stats[affiliateId];
-
-    // Get date range from query params (optional)
-    const startDate = request.nextUrl.searchParams.get('startDate');
-    const endDate = request.nextUrl.searchParams.get('endDate');
-
-    // Get detailed click count from database
-    let clickDetails: any[] = [];
-    if (hasPooledDatabase()) {
-      const sql = await getSql();
-      if (sql) {
-        const query = `
-          SELECT COUNT(*)::int as total, 
-                 COUNT(DISTINCT DATE(created_at))::int as days_active
-          FROM affiliate_clicks
-          WHERE affiliate_id = $1
-          ${startDate ? 'AND created_at >= $2' : ''}
-          ${endDate ? `AND created_at <= ${startDate ? '$3' : '$2'}` : ''}
-        `;
-        const params = [affiliateId];
-        if (startDate) params.push(startDate);
-        if (endDate) params.push(endDate);
-        
-        const result = await sql.query(query, params).catch(() => null);
-        if (result?.rows[0]) {
-          clickDetails = result.rows;
-        }
-      }
-    }
 
     return NextResponse.json({
       ok: true,
@@ -113,3 +85,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+
