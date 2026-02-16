@@ -2,6 +2,9 @@ import { requireAdmin } from '@/lib/admin/requireAdmin';
 import { listAffiliateApplications, listAffiliateStats } from '@/lib/affiliates';
 import ApprovedAffiliatesClient from './ApprovedAffiliatesClient';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function ApprovedAffiliatesPage() {
   const guard = await requireAdmin();
   if (!guard.ok) {
