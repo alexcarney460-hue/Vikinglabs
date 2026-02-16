@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AffiliateSummary, AffiliateConversion, AffiliatePayout } from '@/lib/affiliates';
+import PartnerAgreement from './PartnerAgreement';
 
 type ToolkitTemplate = {
   id: string;
@@ -27,7 +28,7 @@ export default function AffiliateDashboard() {
   const [toolkit, setToolkit] = useState<Toolkit | null>(null);
   const [apiKeys, setApiKeys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit' | 'api-keys'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit' | 'agreement' | 'api-keys'>('overview');
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [creatingKey, setCreatingKey] = useState(false);
@@ -88,7 +89,7 @@ export default function AffiliateDashboard() {
     <div className="space-y-8">
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-200 overflow-x-auto">
-        {(['overview', 'conversions', 'payouts', 'toolkit', 'api-keys'] as const).map((tab) => (
+        {(['overview', 'conversions', 'payouts', 'toolkit', 'agreement', 'api-keys'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -102,6 +103,7 @@ export default function AffiliateDashboard() {
             {tab === 'conversions' && '📈 Conversions'}
             {tab === 'payouts' && '💰 Payouts'}
             {tab === 'toolkit' && '🛠️ Toolkit'}
+            {tab === 'agreement' && '📋 Agreement'}
             {tab === 'api-keys' && '🔑 API Keys'}
           </button>
         ))}
@@ -314,6 +316,9 @@ export default function AffiliateDashboard() {
           </div>
         </div>
       )}
+
+      {/* Partner Agreement Tab */}
+      {activeTab === 'agreement' && <PartnerAgreement />}
 
       {/* API Keys Tab */}
       {activeTab === 'api-keys' && (
