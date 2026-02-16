@@ -20,6 +20,62 @@ export default function ApprovedAffiliatesClient({ initialApplications }: Props)
   const [affiliates, setAffiliates] = useState(initialApplications);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'revenue' | 'orders' | 'expiry'>('revenue');
+  const [editingRates, setEditingRates] = useState<Record<string, string>>({});
+  const [savingRate, setSavingRate] = useState<Record<string, boolean>>({});
+  const [welcomeSent, setWelcomeSent] = useState<Record<string, boolean>>({});
+  const [sendingWelcome, setSendingWelcome] = useState<Record<string, boolean>>({});
+
+  const handleRateChange = (id: string, value: string) => {
+    setEditingRates((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const saveCommissionRate = async (id: string) => {
+    const rateStr = editingRates[id];
+    if (rateStr === undefined) return;
+    const rate = parseFloat(rateStr) / 100;
+    if (isNaN(rate) || rate < 0 || rate > 1) return;
+
+    setSavingRate((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetch(`/api/affiliates/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commissionRate: rate }),
+      });
+      if (res.ok) {
+        setAffiliates((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, commissionRate: rate } : a))
+        );
+        setEditingRates((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    } catch (e) {
+      console.error('Failed to save commission rate:', e);
+    } finally {
+      setSavingRate((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const sendWelcomeEmail = async (id: string) => {
+    setSendingWelcome((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetch(`/api/affiliates/${id}/welcome`, { method: 'POST' });
+      if (res.ok) {
+        setWelcomeSent((prev) => ({ ...prev, [id]: true }));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to send welcome email');
+      }
+    } catch (e) {
+      console.error('Failed to send welcome email:', e);
+      alert('Failed to send welcome email');
+    } finally {
+      setSendingWelcome((prev) => ({ ...prev, [id]: false }));
+    }
+  };
 
   const filtered = useMemo(() => {
     let result = [...affiliates];
@@ -175,6 +231,7 @@ export default function ApprovedAffiliatesClient({ initialApplications }: Props)
                 <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Orders</th>
                 <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Revenue</th>
                 <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Commission</th>
+                <th className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -214,8 +271,37 @@ export default function ApprovedAffiliatesClient({ initialApplications }: Props)
                     <td className="px-6 py-4 text-right">
                       <div>
                         <p className="text-sm font-bold text-amber-600">${(commission / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                        <p className="text-xs text-slate-400">{(aff.commissionRate * 100).toFixed(0)}%</p>
+                        <div className="mt-1 flex items-center justify-end gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            className="w-16 rounded border border-slate-300 px-1 py-0.5 text-right text-xs focus:border-amber-500 focus:outline-none"
+                            value={editingRates[aff.id] ?? (aff.commissionRate * 100).toFixed(0)}
+                            onChange={(e) => handleRateChange(aff.id, e.target.value)}
+                          />
+                          <span className="text-xs text-slate-400">%</span>
+                          {editingRates[aff.id] !== undefined && (
+                            <button
+                              onClick={() => saveCommissionRate(aff.id)}
+                              disabled={savingRate[aff.id]}
+                              className="ml-1 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                            >
+                              {savingRate[aff.id] ? '...' : 'Save'}
+                            </button>
+                          )}
+                        </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => sendWelcomeEmail(aff.id)}
+                        disabled={sendingWelcome[aff.id] || welcomeSent[aff.id]}
+                        className="rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {welcomeSent[aff.id] ? 'Sent ✓' : sendingWelcome[aff.id] ? 'Sending...' : 'Send Welcome'}
+                      </button>
                     </td>
                   </tr>
                 );

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authjs/options';
-import { updateAffiliateApplication } from '@/lib/affiliates';
+import { updateAffiliateApplication, updateAffiliateCommissionRate } from '@/lib/affiliates';
 import type { AffiliateStatus } from '@/lib/affiliates';
 
 const allowed = new Set<AffiliateStatus>(['approved', 'declined', 'pending', 'needs_info']);
@@ -34,9 +34,22 @@ export async function PATCH(req: Request, context: any) {
       : undefined;
     const discordUserId = typeof body?.discordUserId === 'string' ? body.discordUserId.trim() || null : undefined;
     const autoInvite = Boolean(body?.autoInvite);
+    const commissionRate = Number.isFinite(body?.commissionRate) ? Number(body.commissionRate) : undefined;
 
-    if (!status && signupCreditCents === undefined && discordUserId === undefined) {
+    if (!status && signupCreditCents === undefined && discordUserId === undefined && commissionRate === undefined) {
       return NextResponse.json({ error: 'No changes provided.' }, { status: 400 });
+    }
+
+    // Handle commission rate update separately
+    if (commissionRate !== undefined) {
+      const updated = await updateAffiliateCommissionRate(id, commissionRate);
+      if (!updated) {
+        return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+      }
+      // If only commission rate was changed, return early
+      if (!status && signupCreditCents === undefined && discordUserId === undefined) {
+        return NextResponse.json({ application: updated });
+      }
     }
 
     const updated = await updateAffiliateApplication({

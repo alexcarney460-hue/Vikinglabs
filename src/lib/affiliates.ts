@@ -169,6 +169,21 @@ function normalizeInput(value?: string | null) {
 }
 
 async function isCodeAvailable(code: string) {
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_applications')
+        .select('id')
+        .eq('code', code)
+        .limit(1);
+      if (!error) return !data || data.length === 0;
+    } catch (e) {
+      console.error('[isCodeAvailable] Supabase error:', e);
+    }
+  }
+
   const sql = await getDb();
   if (sql) {
     const result = await sql`
@@ -756,6 +771,26 @@ export async function recordAffiliateClick(input: {
     createdAt: now,
   };
 
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('affiliate_clicks').insert([{
+        id: record.id,
+        affiliate_id: record.affiliateId,
+        code: record.code,
+        landing_path: record.landingPath,
+        referrer: record.referrer,
+        user_agent: record.userAgent,
+        created_at: record.createdAt,
+      }]);
+      if (!error) return;
+      console.error('[recordAffiliateClick] Supabase error:', error);
+    } catch (e) {
+      console.error('[recordAffiliateClick] Supabase failed:', e);
+    }
+  }
+
   const sql = await getDb();
   if (sql) {
     await ensureAffiliateTables();
@@ -795,6 +830,28 @@ export async function recordOrderAffiliate(input: {
     createdAt: now,
   };
 
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('order_affiliates').insert([{
+        id: record.id,
+        provider: record.provider,
+        order_id: record.orderId,
+        affiliate_id: record.affiliateId,
+        code: record.code,
+        amount_cents: record.amountCents,
+        currency: record.currency,
+        metadata: record.metadata,
+        created_at: record.createdAt,
+      }]);
+      if (!error) return;
+      console.error('[recordOrderAffiliate] Supabase error:', error);
+    } catch (e) {
+      console.error('[recordOrderAffiliate] Supabase failed:', e);
+    }
+  }
+
   const sql = await getDb();
   if (sql) {
     await ensureAffiliateTables();
@@ -819,6 +876,59 @@ export async function listAffiliateStats(ids: string[]): Promise<Record<string, 
   });
 
   if (ids.length === 0) return map;
+
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const idsArray = ids.filter(Boolean);
+
+      // Get clicks grouped by affiliate
+      const { data: clickData, error: clickErr } = await supabase
+        .from('affiliate_clicks')
+        .select('affiliate_id')
+        .in('affiliate_id', idsArray);
+
+      if (!clickErr && clickData) {
+        const clickCounts: Record<string, number> = {};
+        for (const row of clickData) {
+          const aid = row.affiliate_id;
+          if (aid) clickCounts[aid] = (clickCounts[aid] || 0) + 1;
+        }
+        for (const [aid, count] of Object.entries(clickCounts)) {
+          if (map[aid]) map[aid].clicks = count;
+        }
+      }
+
+      // Get orders grouped by affiliate
+      const { data: orderData, error: orderErr } = await supabase
+        .from('order_affiliates')
+        .select('affiliate_id, amount_cents')
+        .in('affiliate_id', idsArray);
+
+      if (!orderErr && orderData) {
+        const orderCounts: Record<string, { orders: number; revenueCents: number }> = {};
+        for (const row of orderData) {
+          const aid = row.affiliate_id;
+          if (aid) {
+            if (!orderCounts[aid]) orderCounts[aid] = { orders: 0, revenueCents: 0 };
+            orderCounts[aid].orders += 1;
+            orderCounts[aid].revenueCents += row.amount_cents ?? 0;
+          }
+        }
+        for (const [aid, stats] of Object.entries(orderCounts)) {
+          if (map[aid]) {
+            map[aid].orders = stats.orders;
+            map[aid].revenueCents = stats.revenueCents;
+          }
+        }
+      }
+
+      return map;
+    } catch (e) {
+      console.error('[listAffiliateStats] Supabase failed:', e);
+    }
+  }
 
   const sql = await getDb();
   if (sql) {
@@ -870,6 +980,47 @@ export async function listAffiliateStats(ids: string[]): Promise<Record<string, 
 export async function exportAffiliatePayoutsCsv(options?: { start?: string; end?: string }) {
   const start = options?.start ? new Date(options.start).toISOString() : null;
   const end = options?.end ? new Date(options.end).toISOString() : null;
+
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      // Get approved affiliates
+      const { data: apps, error: appErr } = await supabase
+        .from('affiliate_applications')
+        .select('id, name, email, code, created_at')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (!appErr && apps) {
+        const results = [];
+        for (const app of apps) {
+          let query = supabase
+            .from('order_affiliates')
+            .select('id, amount_cents')
+            .eq('affiliate_id', app.id);
+          if (start) query = query.gte('created_at', start);
+          if (end) query = query.lte('created_at', end);
+
+          const { data: orders } = await query;
+          const orderCount = orders?.length ?? 0;
+          const revenueCents = (orders ?? []).reduce((sum: number, o: any) => sum + (o.amount_cents ?? 0), 0);
+
+          results.push({
+            affiliateId: app.id,
+            name: app.name,
+            email: app.email,
+            code: app.code ?? null,
+            orderCount,
+            revenueCents,
+          });
+        }
+        return results;
+      }
+    } catch (e) {
+      console.error('[exportAffiliatePayoutsCsv] Supabase failed:', e);
+    }
+  }
 
   const sql = await getDb();
   if (sql) {
@@ -1079,6 +1230,21 @@ export async function notifyAffiliateAdmin(application: AffiliateApplication) {
 export async function getAffiliateById(id: string): Promise<AffiliateApplication | null> {
   if (!id) return null;
 
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_applications')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (!error && data) return formatAffiliateRow(data);
+    } catch (e) {
+      console.error('[getAffiliateById] Supabase failed:', e);
+    }
+  }
+
   const sql = await getDb();
   if (sql) {
     const result = await sql`
@@ -1101,6 +1267,23 @@ export async function getAffiliateById(id: string): Promise<AffiliateApplication
 export async function getAffiliateByEmail(email: string): Promise<AffiliateApplication | null> {
   const normalized = normalizeInput(email);
   if (!normalized) return null;
+
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_applications')
+        .select('*')
+        .eq('email', normalized)
+        .eq('status', 'approved')
+        .limit(1)
+        .single();
+      if (!error && data) return formatAffiliateRow(data);
+    } catch (e) {
+      console.error('[getAffiliateByEmail] Supabase failed:', e);
+    }
+  }
 
   const sql = await getDb();
   if (sql) {
@@ -1133,6 +1316,31 @@ export type AffiliateConversion = {
 };
 
 export async function listAffiliateConversions(affiliateId: string, limit = 50): Promise<AffiliateConversion[]> {
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_conversions')
+        .select('id, order_id, amount_cents, commission_cents, status, created_at')
+        .eq('affiliate_id', affiliateId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (!error && data) {
+        return data.map((r: any) => ({
+          id: r.id,
+          orderId: r.order_id,
+          amountCents: r.amount_cents,
+          commissionCents: r.commission_cents,
+          status: r.status,
+          createdAt: r.created_at,
+        }));
+      }
+    } catch (e) {
+      console.error('[listAffiliateConversions] Supabase failed:', e);
+    }
+  }
+
   const sql = await getDb();
   if (sql) {
     const result = await sql`
@@ -1160,7 +1368,7 @@ export async function listAffiliateConversions(affiliateId: string, limit = 50):
       id: o.id,
       orderId: o.id,
       amountCents: o.amountCents ?? 0,
-      commissionCents: Math.round((o.amountCents ?? 0) * 0.1), // default 10%
+      commissionCents: Math.round((o.amountCents ?? 0) * 0.1),
       status: 'completed',
       createdAt: o.createdAt,
     }));
@@ -1175,6 +1383,30 @@ export type AffiliatePayout = {
 };
 
 export async function listAffiliatePayouts(affiliateId: string, limit = 20): Promise<AffiliatePayout[]> {
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_payouts')
+        .select('id, amount_cents, status, reference, created_at')
+        .eq('affiliate_id', affiliateId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (!error && data) {
+        return data.map((r: any) => ({
+          id: r.id,
+          amountCents: r.amount_cents,
+          status: r.status,
+          reference: r.reference,
+          createdAt: r.created_at,
+        }));
+      }
+    } catch (e) {
+      console.error('[listAffiliatePayouts] Supabase failed:', e);
+    }
+  }
+
   const sql = await getDb();
   if (sql) {
     const result = await sql`
@@ -1245,6 +1477,116 @@ export async function getAffiliateSummary(affiliateId: string): Promise<Affiliat
     last30dSalesCents,
     conversionCount: conversions.length,
   };
+}
+
+export async function updateAffiliateCommissionRate(id: string, commissionRate: number): Promise<AffiliateApplication | null> {
+  const now = new Date().toISOString();
+
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_applications')
+        .update({ commission_rate: commissionRate, updated_at: now })
+        .eq('id', id)
+        .select()
+        .single();
+      if (!error && data) return formatAffiliateRow(data);
+    } catch (e) {
+      console.error('[updateAffiliateCommissionRate] Supabase failed:', e);
+    }
+  }
+
+  const sql = await getDb();
+  if (sql) {
+    const result = await sql`
+      UPDATE affiliate_applications
+      SET commission_rate = ${commissionRate}, updated_at = ${now}
+      WHERE id = ${id}
+      RETURNING *
+    `;
+    if (result.rows[0]) return formatAffiliateRow(result.rows[0]);
+  }
+
+  const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
+  const idx = store.applications.findIndex(app => app.id === id);
+  if (idx === -1) return null;
+  store.applications[idx].commissionRate = commissionRate;
+  store.applications[idx].updatedAt = now;
+  await writeJson(STORAGE_FILE, store);
+  return store.applications[idx];
+}
+
+export async function sendWelcomeEmail(affiliate: AffiliateApplication): Promise<void> {
+  if (!affiliate.email || !affiliate.code) {
+    throw new Error('Missing email or code');
+  }
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) {
+    throw new Error('SMTP credentials not configured');
+  }
+
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === 'true';
+  const from = process.env.AFFILIATE_EMAIL || 'info@vikinglabs.co';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co';
+  const commissionPct = (affiliate.commissionRate * 100).toFixed(0);
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
+
+  const referralUrl = `${siteUrl}/r/${affiliate.code}`;
+  const dashboardUrl = `${siteUrl}/account`;
+
+  const subject = `Welcome to the Viking Labs Affiliate Program!`;
+  const text = `Hi ${affiliate.name},\n\nWelcome to the Viking Labs Affiliate Program! We're thrilled to have you on board.\n\nHere are your details:\n- Affiliate Code: ${affiliate.code}\n- Your Referral Link: ${referralUrl}\n- Commission Rate: ${commissionPct}%\n- Your Dashboard: ${dashboardUrl} (click the Affiliate Dashboard tab)\n\nHow it works:\n1. Share your referral link with your audience\n2. When someone makes a purchase through your link, you earn ${commissionPct}% commission\n3. Track your clicks, sales, and earnings in your dashboard\n\nIf you have any questions, just reply to this email.\n\nBest regards,\nViking Labs Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #1e293b;">Welcome to Viking Labs, ${affiliate.name}! 🎉</h2>
+      <p>We're thrilled to have you in our affiliate program.</p>
+      
+      <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0;">
+        <p style="margin: 0 0 8px; font-size: 14px; color: #64748b;">Your Affiliate Code</p>
+        <p style="margin: 0; font-size: 24px; font-weight: bold; color: #1e293b;">${affiliate.code}</p>
+      </div>
+      
+      <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 24px 0;">
+        <p style="margin: 0 0 8px; font-size: 14px; color: #1e40af;">Commission Rate</p>
+        <p style="margin: 0; font-size: 20px; font-weight: bold; color: #1e40af;">${commissionPct}%</p>
+      </div>
+      
+      <h3>How It Works</h3>
+      <ol style="line-height: 1.8; color: #475569;">
+        <li>Share your referral link: <a href="${referralUrl}">${referralUrl}</a></li>
+        <li>Earn ${commissionPct}% on every purchase made through your link</li>
+        <li>Track everything in your <a href="${dashboardUrl}">affiliate dashboard</a></li>
+      </ol>
+      
+      <div style="margin: 32px 0;">
+        <a href="${dashboardUrl}" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Go to Your Dashboard</a>
+      </div>
+      
+      <p style="color: #64748b; font-size: 14px;">Questions? Just reply to this email.</p>
+      <p style="color: #64748b; font-size: 14px;">Best regards,<br><strong>Viking Labs Team</strong></p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    to: affiliate.email,
+    from,
+    subject,
+    text,
+    html,
+  });
 }
 
 function formatAffiliateRow(row: any): AffiliateApplication {
