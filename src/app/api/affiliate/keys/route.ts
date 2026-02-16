@@ -57,9 +57,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   // Key creation requires session auth only (not Bearer) for security
-  const affiliate = await getAffiliateFromSession(req);
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  const affiliate = await getAffiliateByEmail(session.user.email);
   if (!affiliate) {
-    return NextResponse.json({ error: 'Unauthorized - session required' }, { status: 401 });
+    return NextResponse.json({ error: 'Not an approved affiliate. Please apply at /affiliates/apply' }, { status: 403 });
   }
 
   try {
@@ -84,7 +89,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error('[POST /api/affiliate/keys]', error);
-    return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
+    return NextResponse.json({ error: `Failed to create API key: ${error instanceof Error ? error.message : 'Unknown error'}` }, { status: 500 });
   }
 }
 

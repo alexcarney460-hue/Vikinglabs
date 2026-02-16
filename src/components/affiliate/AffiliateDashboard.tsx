@@ -344,18 +344,18 @@ export default function AffiliateDashboard() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name: newKeyName }),
                       });
+                      const data = await res.json();
                       if (res.ok) {
-                        const data = await res.json();
                         setApiKeys([...apiKeys, { ...data.keyRecord, name: newKeyName }]);
                         setNewKeyName('');
                         alert(`Key created! Store it safely:\n\n${data.key}\n\nYou won't be able to see it again.`);
                       } else {
-                        const err = await res.json();
-                        alert(`Error: ${err.error || 'Failed to create key'}`);
+                        console.error('Create key error:', data);
+                        alert(`Error: ${data.error || 'Failed to create key'}`);
                       }
                     } catch (err) {
                       console.error('Error creating key:', err);
-                      alert('Error creating key');
+                      alert(`Error: ${err instanceof Error ? err.message : 'Failed to create key'}`);
                     } finally {
                       setCreatingKey(false);
                     }
