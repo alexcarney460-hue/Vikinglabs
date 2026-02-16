@@ -38,11 +38,11 @@ export default function AffiliateForm() {
         throw new Error(data.error || 'Unable to submit.');
       }
 
-      // Also push to HubSpot as a lead
+      // Also push to HubSpot as a lead (non-blocking)
       const [firstname, ...lastnameParts] = form.name.split(' ');
       const lastname = lastnameParts.join(' ') || '';
 
-      await fetch('/api/contacts', {
+      fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,8 +53,7 @@ export default function AffiliateForm() {
           source: 'affiliate_signup',
         }),
       }).catch((error) => {
-        console.error('[AffiliateForm] HubSpot sync failed:', error);
-        // Don't fail the main submission if HubSpot fails
+        console.error('[AffiliateForm] HubSpot sync failed (non-blocking):', error);
       });
 
       setStatus('success');
