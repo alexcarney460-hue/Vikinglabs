@@ -3,6 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import dynamic from 'next/dynamic';
+
+const AffiliateDashboard = dynamic(() => import('@/components/affiliate/AffiliateDashboard'), {
+  ssr: false,
+  loading: () => <div className="text-slate-600">Loading affiliate dashboard…</div>,
+});
 
 type Profile = {
   displayName?: string;
@@ -49,12 +55,30 @@ export default function AccountClient() {
   const [profile, setProfile] = useState<Profile>({});
   const [saved, setSaved] = useState<ResearchSaved>({ ids: [] });
   const [justSaved, setJustSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'research' | 'affiliate'>('profile');
+  const [isAffiliate, setIsAffiliate] = useState(false);
 
   useEffect(() => {
     if (!email) return;
     setProfile(loadJson<Profile>(profileKey, {}));
     setSaved(loadJson<ResearchSaved>(savedKey, { ids: [] }));
   }, [email, profileKey, savedKey]);
+
+  useEffect(() => {
+    // Check if user is an approved affiliate
+    const checkAffiliate = async () => {
+      try {
+        const res = await fetch('/api/affiliate/summary');
+        setIsAffiliate(res.ok);
+      } catch {
+        setIsAffiliate(false);
+      }
+    };
+
+    if (user) {
+      checkAffiliate();
+    }
+  }, [user]);
 
   function onSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -103,7 +127,7 @@ export default function AccountClient() {
           <h1 className="text-3xl font-black tracking-tight text-slate-900">
             Welcome{user?.name ? `, ${user.name}` : ''}
           </h1>
-          <p className="mt-2 text-slate-600">Profile & Research Library (saved items are private to this browser for now).</p>
+          <p className="mt-2 text-slate-600">Manage your profile, research library{isAffiliate ? ', and affiliate dashboard' : ''}.</p>
         </div>
         <div className="flex items-center gap-2">
           {role === 'admin' && (
@@ -123,7 +147,44 @@ export default function AccountClient() {
         </div>
       </div>
 
-      <div className="mt-10 grid gap-6 lg:grid-cols-3">
+      {/* Tab Navigation */}
+      <div className="mt-8 flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors ${
+            activeTab === 'profile'
+              ? 'border-b-2 border-amber-500 text-amber-600'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Profile
+        </button>
+        <button
+          onClick={() => setActiveTab('research')}
+          className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors ${
+            activeTab === 'research'
+              ? 'border-b-2 border-amber-500 text-amber-600'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Research Library
+        </button>
+        {isAffiliate && (
+          <button
+            onClick={() => setActiveTab('affiliate')}
+            className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors ${
+              activeTab === 'affiliate'
+                ? 'border-b-2 border-amber-500 text-amber-600'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Affiliate Dashboard
+          </button>
+        )}
+      </div>
+
+      {/* Profile Tab */}
+      {activeTab === 'profile' && <div className="mt-10 grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-1">
           <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">Profile</h2>
           <div className="mt-4 space-y-2 text-sm text-slate-700">
@@ -224,6 +285,49 @@ export default function AccountClient() {
           </div>
         </div>
       </div>
+      </div>
+
+      {/* Research Library Tab */}
+      {activeTab === 'research' && (
+        <div className="mt-10">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">Research Library</h2>
+                <p className="mt-2 text-slate-600">
+                  Browse public research notes and save items for quick access.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">MVP</span>
+                <Link
+                  href="/research"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-300"
+                >
+                  Open library
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-sm font-bold text-slate-900">Saved items</div>
+              <p className="mt-1 text-sm text-slate-600">You have {saved.ids.length} saved item{saved.ids.length === 1 ? '' : 's'}.</p>
+              <div className="mt-4">
+                <Link href="/research?saved=1" className="text-sm font-bold text-amber-700 hover:underline">
+                  View saved →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Affiliate Dashboard Tab */}
+      {activeTab === 'affiliate' && isAffiliate && (
+        <div className="mt-10">
+          <AffiliateDashboard />
+        </div>
+      )}
     </div>
   );
 }

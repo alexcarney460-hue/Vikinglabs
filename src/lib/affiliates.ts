@@ -138,6 +138,29 @@ export async function ensureAffiliateTables() {
       created_at timestamptz NOT NULL
     );
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS affiliate_conversions (
+      id uuid PRIMARY KEY,
+      affiliate_id uuid NOT NULL,
+      order_id text NOT NULL,
+      amount_cents int NOT NULL,
+      commission_cents int NOT NULL,
+      status text NOT NULL DEFAULT 'completed',
+      created_at timestamptz NOT NULL
+    );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS affiliate_payouts (
+      id uuid PRIMARY KEY,
+      affiliate_id uuid NOT NULL,
+      amount_cents int NOT NULL,
+      status text NOT NULL DEFAULT 'pending',
+      reference text NULL,
+      created_at timestamptz NOT NULL
+    );
+  `;
 }
 
 function normalizeInput(value?: string | null) {
@@ -816,4 +839,180 @@ export async function notifyAffiliateAdmin(application: AffiliateApplication) {
     subject,
     text,
   });
+}
+
+/**
+ * Dashboard Helper Functions for Approved Affiliates
+ */
+
+export async function getAffiliateByEmail(email: string): Promise<AffiliateApplication | null> {
+  const normalized = normalizeInput(email);
+  if (!normalized) return null;
+
+  const sql = await getDb();
+  if (sql) {
+    const result = await sql`
+      SELECT id, name, email, social_handle, audience_size, channels, notes, status, code,
+             signup_credit_cents, commission_rate, approved_at, expires_at, declined_at,
+             requested_info_at, discord_user_id, created_at, updated_at
+      FROM affiliate_applications
+      WHERE email = ${normalized} AND status = 'approved'
+      LIMIT 1
+    `;
+    if (result.rows.length > 0) {
+      return formatAffiliateRow(result.rows[0] as any);
+    }
+  }
+
+  const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
+  return store.applications.find(
+    (app) => app.email?.toLowerCase() === normalized && app.status === 'approved'
+  ) || null;
+}
+
+export type AffiliateConversion = {
+  id: string;
+  orderId: string;
+  amountCents: number;
+  commissionCents: number;
+  status: string;
+  createdAt: string;
+};
+
+export async function listAffiliateConversions(affiliateId: string, limit = 50): Promise<AffiliateConversion[]> {
+  const sql = await getDb();
+  if (sql) {
+    const result = await sql`
+      SELECT id, order_id, amount_cents, commission_cents, status, created_at
+      FROM affiliate_conversions
+      WHERE affiliate_id = ${affiliateId}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return (result.rows as any[]).map((r) => ({
+      id: r.id,
+      orderId: r.order_id,
+      amountCents: r.amount_cents,
+      commissionCents: r.commission_cents,
+      status: r.status,
+      createdAt: r.created_at,
+    }));
+  }
+
+  const orderStore = await readJson<OrderAffiliateStore>(ORDER_STORAGE_FILE, EMPTY_ORDER_STORE);
+  return orderStore.orders
+    .filter((o) => o.affiliateId === affiliateId)
+    .slice(0, limit)
+    .map((o) => ({
+      id: o.id,
+      orderId: o.id,
+      amountCents: o.amountCents ?? 0,
+      commissionCents: Math.round((o.amountCents ?? 0) * 0.1), // default 10%
+      status: 'completed',
+      createdAt: o.createdAt,
+    }));
+}
+
+export type AffiliatePayout = {
+  id: string;
+  amountCents: number;
+  status: 'pending' | 'processing' | 'completed';
+  reference?: string;
+  createdAt: string;
+};
+
+export async function listAffiliatePayouts(affiliateId: string, limit = 20): Promise<AffiliatePayout[]> {
+  const sql = await getDb();
+  if (sql) {
+    const result = await sql`
+      SELECT id, amount_cents, status, reference, created_at
+      FROM affiliate_payouts
+      WHERE affiliate_id = ${affiliateId}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return (result.rows as any[]).map((r) => ({
+      id: r.id,
+      amountCents: r.amount_cents,
+      status: r.status,
+      reference: r.reference,
+      createdAt: r.created_at,
+    }));
+  }
+
+  // No local storage for payouts yet
+  return [];
+}
+
+export type AffiliateSummary = {
+  affiliateId: string;
+  name: string;
+  email: string;
+  code: string | null;
+  commissionRate: number;
+  totalSalesCents: number;
+  totalCommissionCents: number;
+  pendingCommissionCents: number;
+  paidCommissionCents: number;
+  last30dSalesCents: number;
+  conversionCount: number;
+};
+
+export async function getAffiliateSummary(affiliateId: string): Promise<AffiliateSummary | null> {
+  const app = await getAffiliateApplicationById(affiliateId);
+  if (!app || app.status !== 'approved') return null;
+
+  const conversions = await listAffiliateConversions(affiliateId, 1000);
+  const now = Date.now();
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+  const totalSalesCents = conversions.reduce((sum, c) => sum + c.amountCents, 0);
+  const totalCommissionCents = conversions.reduce((sum, c) => sum + c.commissionCents, 0);
+
+  const last30dSalesCents = conversions
+    .filter((c) => new Date(c.createdAt).getTime() > thirtyDaysAgo)
+    .reduce((sum, c) => sum + c.amountCents, 0);
+
+  const payouts = await listAffiliatePayouts(affiliateId, 1000);
+  const paidCommissionCents = payouts
+    .filter((p) => p.status === 'completed')
+    .reduce((sum, p) => sum + p.amountCents, 0);
+  const pendingCommissionCents = totalCommissionCents - paidCommissionCents;
+
+  return {
+    affiliateId,
+    name: app.name,
+    email: app.email,
+    code: app.code ?? null,
+    commissionRate: app.commissionRate,
+    totalSalesCents,
+    totalCommissionCents,
+    pendingCommissionCents: Math.max(0, pendingCommissionCents),
+    paidCommissionCents,
+    last30dSalesCents,
+    conversionCount: conversions.length,
+  };
+}
+
+function formatAffiliateRow(row: any): AffiliateApplication {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    socialHandle: row.social_handle,
+    audienceSize: row.audience_size,
+    channels: row.channels,
+    notes: row.notes,
+    status: row.status,
+    code: row.code,
+    signupCreditCents: row.signup_credit_cents,
+    commissionRate: row.commission_rate,
+    approvedAt: row.approved_at,
+    expiresAt: row.expires_at,
+    declinedAt: row.declined_at,
+    requestedInfoAt: row.requested_info_at,
+    discordUserId: row.discord_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
