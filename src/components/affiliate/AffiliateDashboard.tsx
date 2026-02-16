@@ -29,6 +29,8 @@ export default function AffiliateDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit' | 'api-keys'>('overview');
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -315,27 +317,108 @@ export default function AffiliateDashboard() {
 
       {/* API Keys Tab */}
       {activeTab === 'api-keys' && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900 mb-6">API Keys</h3>
-          <p className="text-sm text-slate-600 mb-6">Create and manage API keys for programmatic access to affiliate resources.</p>
-          
-          {apiKeys.length === 0 ? (
-            <p className="text-sm text-slate-600">No API keys yet. Check back when the API key endpoint is implemented.</p>
-          ) : (
-            <div className="space-y-3">
-              {apiKeys.map((key: any, idx: number) => (
-                <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-900">{key.name || 'Unnamed'}</p>
-                    <p className="text-xs text-slate-500">ID: {key.id.slice(0, 12)}…</p>
-                  </div>
-                  <button className="rounded-lg bg-red-100 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-200">
-                    Revoke
-                  </button>
-                </div>
-              ))}
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900 mb-6">API Keys</h3>
+            <p className="text-sm text-slate-600 mb-6">Create and manage API keys for programmatic access to affiliate resources.</p>
+            
+            {/* Create Key Form */}
+            <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-6">
+              <h4 className="font-bold text-slate-900 mb-4">Create New Key</h4>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Key name (e.g., 'Dashboard', 'Server')"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  disabled={creatingKey}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                />
+                <button
+                  onClick={async () => {
+                    if (!newKeyName.trim()) return;
+                    setCreatingKey(true);
+                    try {
+                      const res = await fetch('/api/affiliate/keys', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newKeyName }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setApiKeys([...apiKeys, data.key]);
+                        setNewKeyName('');
+                        alert(`Key created! Store it safely:\n\n${data.key.secret}\n\nYou won't be able to see it again.`);
+                      } else {
+                        alert('Failed to create key');
+                      }
+                    } catch (err) {
+                      console.error('Error creating key:', err);
+                      alert('Error creating key');
+                    } finally {
+                      setCreatingKey(false);
+                    }
+                  }}
+                  disabled={creatingKey || !newKeyName.trim()}
+                  className="rounded-lg bg-amber-500 px-6 py-2 font-bold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingKey ? 'Creating…' : 'Create'}
+                </button>
+              </div>
             </div>
-          )}
+
+            {/* Keys List */}
+            {apiKeys.length === 0 ? (
+              <p className="text-sm text-slate-600">No API keys yet. Create one above to get started.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase text-slate-600">Your Keys ({apiKeys.length})</p>
+                {apiKeys.map((key: any, idx: number) => (
+                  <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">{key.name || 'Unnamed'}</p>
+                      <p className="text-xs text-slate-500">ID: {key.id.slice(0, 12)}…</p>
+                      <p className="text-xs text-slate-500">Created: {new Date(key.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        if (!confirm('Revoke this key? It cannot be undone.')) return;
+                        try {
+                          const res = await fetch(`/api/affiliate/keys/${key.id}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            setApiKeys(apiKeys.filter((k) => k.id !== key.id));
+                          }
+                        } catch (err) {
+                          console.error('Error revoking key:', err);
+                        }
+                      }}
+                      className="rounded-lg bg-red-100 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-200"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Usage Info */}
+            <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-6">
+              <h4 className="font-bold text-slate-900 mb-3">Bearer Token Usage</h4>
+              <p className="text-sm text-slate-600 mb-4">
+                Include your API key as a Bearer token in the Authorization header:
+              </p>
+              <code className="block rounded-lg bg-slate-800 px-4 py-3 text-xs font-mono text-slate-100 overflow-x-auto mb-4">
+                Authorization: Bearer &lt;your_api_key&gt;
+              </code>
+              <p className="text-sm text-slate-600 mb-3">Available endpoints:</p>
+              <ul className="text-sm text-slate-600 space-y-1">
+                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/summary</code></li>
+                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/conversions</code></li>
+                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/payouts</code></li>
+                <li>• <code className="bg-slate-200 px-2 py-1 rounded text-xs">/api/affiliate/toolkit</code></li>
+              </ul>
+            </div>
+          </div>
         </div>
       )}
     </div>
