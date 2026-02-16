@@ -180,13 +180,18 @@ async function isCodeAvailable(code: string) {
   return !store.applications.some((app) => app.code === code);
 }
 
-async function generateAffiliateCode(name: string, email: string) {
-  const base = buildAffiliateCodeSeed(name, email);
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const suffix = crypto.randomBytes(2).toString('hex').toUpperCase();
-    const code = formatAffiliateCode(`${base}${suffix}`).slice(0, 12);
+async function generateAffiliateCode(socialHandle: string | null | undefined, name: string, email: string) {
+  // Prefer social handle if provided, otherwise fallback to name
+  let base = socialHandle?.trim() ? formatAffiliateCode(socialHandle) : buildAffiliateCodeSeed(name, email);
+  
+  // Try 100 variations with number suffix (001-100)
+  for (let attempt = 1; attempt <= 100; attempt += 1) {
+    const paddedNum = String(attempt).padStart(3, '0');
+    const code = `${base}-${paddedNum}`.slice(0, 20);
     if (await isCodeAvailable(code)) return code;
   }
+  
+  // Fallback: random code
   return formatAffiliateCode(crypto.randomBytes(4).toString('hex'));
 }
 
@@ -359,14 +364,14 @@ export async function updateAffiliateApplication(input: {
   const sql = await getDb();
   if (sql) {
     const currentRows = await sql`
-      SELECT name, email, code
+      SELECT name, email, code, social_handle
       FROM affiliate_applications
       WHERE id = ${input.id}
       LIMIT 1
     `;
     if (!currentRows.rows[0]) return null;
 
-    const current = currentRows.rows[0] as { name: string; email: string; code: string | null };
+    const current = currentRows.rows[0] as { name: string; email: string; code: string | null; social_handle: string | null };
     let code: string | null = null;
     let approvedAt: string | null = null;
     let expiresAt: string | null = null;
@@ -374,7 +379,7 @@ export async function updateAffiliateApplication(input: {
     let requestedInfoAt: string | null = null;
 
     if (desiredStatus === 'approved') {
-      code = current.code || (await generateAffiliateCode(current.name, current.email));
+      code = current.code || (await generateAffiliateCode(current.social_handle, current.name, current.email));
       approvedAt = now;
       // Set expiry to 60 days from now
       const expiry = new Date();
@@ -454,7 +459,7 @@ export async function updateAffiliateApplication(input: {
 
   const current = store.applications[idx];
   const nextStatus = desiredStatus ?? current.status;
-  const code = nextStatus === 'approved' && !current.code ? await generateAffiliateCode(current.name, current.email) : current.code;
+  const code = nextStatus === 'approved' && !current.code ? await generateAffiliateCode(current.socialHandle, current.name, current.email) : current.code;
   
   let expiresAt = current.expiresAt;
   if (nextStatus === 'approved' && !current.approvedAt) {
