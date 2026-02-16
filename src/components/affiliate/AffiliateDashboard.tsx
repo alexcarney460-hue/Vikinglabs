@@ -304,7 +304,7 @@ export default function AffiliateDashboard() {
                       <p className="text-sm font-bold text-slate-900">{asset.name}</p>
                       <p className="mt-1 text-xs text-slate-600">{asset.description}</p>
                       <a
-                        href={`/affiliate-toolkit/${asset.filename}`}
+                        href={`/${asset.filename}`}
                         download
                         className="mt-3 inline-block rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600"
                       >
