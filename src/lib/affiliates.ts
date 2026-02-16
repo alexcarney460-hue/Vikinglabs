@@ -1732,6 +1732,20 @@ function formatApiKeyRow(row: any): AffiliateApiKey {
 export async function createAffiliateApiKey(
   affiliateId: string
 ): Promise<{ key: string; keyRecord: AffiliateApiKey }> {
+  console.log('[createAffiliateApiKey] Starting for affiliateId:', affiliateId);
+  
+  // First, verify the affiliate exists and is approved
+  const affiliate = await getAffiliateById(affiliateId);
+  console.log('[createAffiliateApiKey] Affiliate lookup result:', affiliate ? { id: affiliate.id, status: affiliate.status, email: affiliate.email } : 'null');
+  
+  if (!affiliate) {
+    throw new Error('Affiliate not found');
+  }
+  
+  if (affiliate.status !== 'approved') {
+    throw new Error(`Affiliate not approved. Current status: ${affiliate.status}`);
+  }
+  
   await ensureAffiliateTables();
   
   // Generate a random 32-byte key
@@ -1746,28 +1760,39 @@ export async function createAffiliateApiKey(
   const id = crypto.randomUUID();
   const scopes = ['read:affiliate'];
   
+  console.log('[createAffiliateApiKey] Generated key data:', { id, affiliateId, last4, hashLength: hash.length });
+  
+  // Try @vercel/postgres first
   const sql = await getDb();
+  console.log('[createAffiliateApiKey] getDb() returned:', sql ? 'SQL client' : 'null');
+  
   if (sql) {
     try {
+      console.log('[createAffiliateApiKey] Attempting SQL insert...');
       const result = await sql`
         INSERT INTO affiliate_api_keys (id, affiliate_id, hash, last4, scopes, created_at)
-        VALUES (${id}, ${affiliateId}, ${hash}, ${last4}, ${scopes}, ${now})
+        VALUES (${id}, ${affiliateId}::uuid, ${hash}, ${last4}, ${scopes}, ${now})
         RETURNING *
       `;
+      console.log('[createAffiliateApiKey] SQL insert successful, rows:', result.rows.length);
       return {
         key,
         keyRecord: formatApiKeyRow(result.rows[0]),
       };
     } catch (error) {
-      console.error('[createAffiliateApiKey] SQL error:', error);
-      throw error;
+      console.error('[createAffiliateApiKey] SQL error (falling back to Supabase):', error);
+      // Don't throw, continue to Supabase fallback
     }
   }
   
   // Fallback to Supabase
+  console.log('[createAffiliateApiKey] Attempting Supabase fallback...');
   const supabase = getSupabase();
+  console.log('[createAffiliateApiKey] getSupabase() returned:', supabase ? 'client' : 'null');
+  
   if (supabase) {
     try {
+      console.log('[createAffiliateApiKey] Inserting into Supabase with data:', { id, affiliate_id: affiliateId, last4 });
       const { data, error } = await supabase
         .from('affiliate_api_keys')
         .insert({
@@ -1781,17 +1806,23 @@ export async function createAffiliateApiKey(
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('[createAffiliateApiKey] Supabase insert error:', error);
+        throw error;
+      }
+      
+      console.log('[createAffiliateApiKey] Supabase insert successful:', data);
       return {
         key,
         keyRecord: formatApiKeyRow(data),
       };
     } catch (error) {
-      console.error('[createAffiliateApiKey] Supabase error:', error);
+      console.error('[createAffiliateApiKey] Supabase error (final):', error);
       throw error;
     }
   }
   
+  console.error('[createAffiliateApiKey] No database available - both SQL and Supabase failed or are null');
   throw new Error('Database not available for API key creation');
 }
 

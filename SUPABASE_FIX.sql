@@ -71,3 +71,20 @@ CREATE TABLE affiliate_payouts (
   reference text NULL,
   created_at timestamptz NOT NULL
 );
+
+-- Create affiliate_api_keys table (NEW)
+DROP TABLE IF EXISTS affiliate_api_keys CASCADE;
+CREATE TABLE affiliate_api_keys (
+  id uuid PRIMARY KEY,
+  affiliate_id uuid NOT NULL REFERENCES affiliate_applications(id) ON DELETE CASCADE,
+  hash text NOT NULL UNIQUE,
+  last4 text NOT NULL,
+  scopes text[] NOT NULL DEFAULT ARRAY['read:affiliate'],
+  revoked_at timestamptz NULL,
+  created_at timestamptz NOT NULL
+);
+
+-- Create indexes for affiliate_api_keys
+CREATE INDEX idx_api_keys_affiliate ON affiliate_api_keys(affiliate_id);
+CREATE INDEX idx_api_keys_hash ON affiliate_api_keys(hash) WHERE revoked_at IS NULL;
+CREATE INDEX idx_api_keys_revoked ON affiliate_api_keys(revoked_at) WHERE revoked_at IS NOT NULL;
