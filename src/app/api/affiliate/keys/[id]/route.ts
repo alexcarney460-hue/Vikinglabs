@@ -16,8 +16,12 @@ async function getAffiliateFromSession(req: NextRequest) {
 
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: any
 ) {
+  const paramsRaw = context?.params;
+  const params = (typeof paramsRaw?.then === 'function') ? await paramsRaw : paramsRaw;
+  const keyId = params?.id as string | undefined;
+
   // Key revocation requires session auth only (not Bearer) for security
   const affiliate = await getAffiliateFromSession(req);
   if (!affiliate) {
@@ -25,7 +29,6 @@ export async function DELETE(
   }
 
   try {
-    const keyId = context.params.id;
     if (!keyId) {
       return NextResponse.json({ error: 'Key ID required' }, { status: 400 });
     }
