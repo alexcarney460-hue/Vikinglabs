@@ -1759,12 +1759,39 @@ export async function createAffiliateApiKey(
         keyRecord: formatApiKeyRow(result.rows[0]),
       };
     } catch (error) {
-      console.error('[createAffiliateApiKey] Database error:', error);
+      console.error('[createAffiliateApiKey] SQL error:', error);
       throw error;
     }
   }
   
-  // Fallback: in-memory storage (not suitable for production)
+  // Fallback to Supabase
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_api_keys')
+        .insert({
+          id,
+          affiliate_id: affiliateId,
+          hash,
+          last4,
+          scopes,
+          created_at: now,
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return {
+        key,
+        keyRecord: formatApiKeyRow(data),
+      };
+    } catch (error) {
+      console.error('[createAffiliateApiKey] Supabase error:', error);
+      throw error;
+    }
+  }
+  
   throw new Error('Database not available for API key creation');
 }
 
@@ -1785,7 +1812,26 @@ export async function getAffiliateApiKeyByAffiliateId(
       `;
       return result.rows.length ? formatApiKeyRow(result.rows[0]) : null;
     } catch (error) {
-      console.error('[getAffiliateApiKeyByAffiliateId] Database error:', error);
+      console.error('[getAffiliateApiKeyByAffiliateId] SQL error:', error);
+    }
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_api_keys')
+        .select('*')
+        .eq('affiliate_id', affiliateId)
+        .is('revoked_at', null)
+        .limit(1)
+        .single();
+      
+      if (error?.code === 'PGRST116') return null; // No rows
+      if (error) throw error;
+      return data ? formatApiKeyRow(data) : null;
+    } catch (error) {
+      console.error('[getAffiliateApiKeyByAffiliateId] Supabase error:', error);
       return null;
     }
   }
@@ -1807,7 +1853,26 @@ export async function getAffiliateApiKeyByHash(hash: string): Promise<AffiliateA
       `;
       return result.rows.length ? formatApiKeyRow(result.rows[0]) : null;
     } catch (error) {
-      console.error('[getAffiliateApiKeyByHash] Database error:', error);
+      console.error('[getAffiliateApiKeyByHash] SQL error:', error);
+    }
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_api_keys')
+        .select('*')
+        .eq('hash', hash)
+        .is('revoked_at', null)
+        .limit(1)
+        .single();
+      
+      if (error?.code === 'PGRST116') return null; // No rows
+      if (error) throw error;
+      return data ? formatApiKeyRow(data) : null;
+    } catch (error) {
+      console.error('[getAffiliateApiKeyByHash] Supabase error:', error);
       return null;
     }
   }
@@ -1831,7 +1896,24 @@ export async function revokeAffiliateApiKey(affiliateId: string): Promise<boolea
       `;
       return result.rows.length > 0;
     } catch (error) {
-      console.error('[revokeAffiliateApiKey] Database error:', error);
+      console.error('[revokeAffiliateApiKey] SQL error:', error);
+    }
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('affiliate_api_keys')
+        .update({ revoked_at: now })
+        .eq('affiliate_id', affiliateId)
+        .is('revoked_at', null);
+      
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('[revokeAffiliateApiKey] Supabase error:', error);
       return false;
     }
   }
