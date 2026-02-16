@@ -15,5 +15,6 @@ export async function GET() {
     SMTP_PASS: !!process.env.SMTP_PASS,
     SMTP_PORT: !!process.env.SMTP_PORT,
     SMTP_SECURE: !!process.env.SMTP_SECURE,
+    RESEND_API_KEY: !!process.env.RESEND_API_KEY,
   });
 }

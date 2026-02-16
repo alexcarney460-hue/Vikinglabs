@@ -1523,26 +1523,18 @@ export async function sendWelcomeEmail(affiliate: AffiliateApplication): Promise
     throw new Error('Missing email or code');
   }
 
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) {
-    throw new Error('SMTP credentials not configured');
+  const resendKey = process.env.RESEND_API_KEY;
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  if (!resendKey && (!smtpHost || !smtpUser || !smtpPass)) {
+    throw new Error('Email credentials not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/SMTP_PASS.');
   }
 
-  const port = Number(process.env.SMTP_PORT || 587);
-  const secure = process.env.SMTP_SECURE === 'true';
-  const from = process.env.AFFILIATE_EMAIL || 'info@vikinglabs.co';
+  const from = process.env.AFFILIATE_EMAIL || 'Viking Labs <info@vikinglabs.co>';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co';
   const commissionPct = (affiliate.commissionRate * 100).toFixed(0);
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
-  });
-
   const referralUrl = `${siteUrl}/r/${affiliate.code}`;
   const dashboardUrl = `${siteUrl}/account`;
 
@@ -1579,6 +1571,31 @@ export async function sendWelcomeEmail(affiliate: AffiliateApplication): Promise
       <p style="color: #64748b; font-size: 14px;">Best regards,<br><strong>Viking Labs Team</strong></p>
     </div>
   `;
+
+  // Prefer Resend API, fall back to SMTP/nodemailer
+  if (resendKey) {
+    const { Resend } = await import('resend');
+    const resend = new Resend(resendKey);
+    const { error } = await resend.emails.send({
+      from,
+      to: affiliate.email,
+      subject,
+      text,
+      html,
+    });
+    if (error) throw new Error(`Resend error: ${error.message}`);
+    return;
+  }
+
+  // SMTP fallback
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === 'true';
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port,
+    secure,
+    auth: { user: smtpUser, pass: smtpPass },
+  });
 
   await transporter.sendMail({
     to: affiliate.email,
