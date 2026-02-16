@@ -1,5 +1,8 @@
-import { redirect } from 'next/navigation';
-import { getServerSession } from 'next-auth/next';
+'use client';
+
+import { useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 const StackOptimizer = dynamic(() => import('@/components/tools/StackOptimizer'), {
@@ -11,16 +14,30 @@ const StackOptimizer = dynamic(() => import('@/components/tools/StackOptimizer')
   ),
 });
 
-export const metadata = {
-  title: 'Stack Optimizer - Research Protocol Scheduling',
-  description: 'Plan and optimize your research protocol administration schedule.',
-};
+export default function StackOptimizerPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-export default async function StackOptimizerPage() {
-  const session = await getServerSession();
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/account/login');
+    }
+  }, [status, router]);
+
+  if (status === 'loading') {
+    return (
+      <div className="container mx-auto px-6 py-12 max-w-4xl">
+        <div className="text-slate-600">Loading…</div>
+      </div>
+    );
+  }
 
   if (!session?.user) {
-    redirect('/account/login');
+    return (
+      <div className="container mx-auto px-6 py-12 max-w-4xl">
+        <div className="text-slate-600">Redirecting…</div>
+      </div>
+    );
   }
 
   return (
