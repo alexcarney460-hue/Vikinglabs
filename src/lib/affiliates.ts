@@ -59,6 +59,16 @@ export type OrderAffiliate = {
   createdAt: string;
 };
 
+export type AffiliateApiKey = {
+  id: string;
+  affiliateId: string;
+  hash: string;
+  last4: string;
+  scopes: string[];
+  revokedAt?: string | null;
+  createdAt: string;
+};
+
 type AffiliateStore = {
   applications: AffiliateApplication[];
 };
@@ -159,6 +169,18 @@ export async function ensureAffiliateTables() {
       amount_cents int NOT NULL,
       status text NOT NULL DEFAULT 'pending',
       reference text NULL,
+      created_at timestamptz NOT NULL
+    );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS affiliate_api_keys (
+      id uuid PRIMARY KEY,
+      affiliate_id uuid NOT NULL,
+      hash text NOT NULL UNIQUE,
+      last4 text NOT NULL,
+      scopes text[] NOT NULL DEFAULT ARRAY['read:affiliate'],
+      revoked_at timestamptz NULL,
       created_at timestamptz NOT NULL
     );
   `;
@@ -1690,4 +1712,185 @@ function formatAffiliateRow(row: any): AffiliateApplication {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function formatApiKeyRow(row: any): AffiliateApiKey {
+  return {
+    id: row.id,
+    affiliateId: row.affiliate_id,
+    hash: row.hash,
+    last4: row.last4,
+    scopes: row.scopes || ['read:affiliate'],
+    revokedAt: row.revoked_at,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * Create a new API key for an affiliate
+ */
+export async function createAffiliateApiKey(
+  affiliateId: string
+): Promise<{ key: string; keyRecord: AffiliateApiKey }> {
+  await ensureAffiliateTables();
+  
+  // Generate a random 32-byte key
+  const randomBytes = crypto.randomBytes(32);
+  const key = randomBytes.toString('hex');
+  const last4 = key.slice(-4);
+  
+  // Hash the key for storage
+  const hash = crypto.createHash('sha256').update(key).digest('hex');
+  
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  const scopes = ['read:affiliate'];
+  
+  const sql = await getDb();
+  if (sql) {
+    try {
+      const result = await sql`
+        INSERT INTO affiliate_api_keys (id, affiliate_id, hash, last4, scopes, created_at)
+        VALUES (${id}, ${affiliateId}, ${hash}, ${last4}, ${scopes}, ${now})
+        RETURNING *
+      `;
+      return {
+        key,
+        keyRecord: formatApiKeyRow(result.rows[0]),
+      };
+    } catch (error) {
+      console.error('[createAffiliateApiKey] Database error:', error);
+      throw error;
+    }
+  }
+  
+  // Fallback: in-memory storage (not suitable for production)
+  throw new Error('Database not available for API key creation');
+}
+
+/**
+ * Get an API key by affiliate ID
+ */
+export async function getAffiliateApiKeyByAffiliateId(
+  affiliateId: string
+): Promise<AffiliateApiKey | null> {
+  const sql = await getDb();
+  if (sql) {
+    try {
+      const result = await sql`
+        SELECT * FROM affiliate_api_keys
+        WHERE affiliate_id = ${affiliateId}
+        AND revoked_at IS NULL
+        LIMIT 1
+      `;
+      return result.rows.length ? formatApiKeyRow(result.rows[0]) : null;
+    } catch (error) {
+      console.error('[getAffiliateApiKeyByAffiliateId] Database error:', error);
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Get an API key by its hash
+ */
+export async function getAffiliateApiKeyByHash(hash: string): Promise<AffiliateApiKey | null> {
+  const sql = await getDb();
+  if (sql) {
+    try {
+      const result = await sql`
+        SELECT * FROM affiliate_api_keys
+        WHERE hash = ${hash}
+        AND revoked_at IS NULL
+        LIMIT 1
+      `;
+      return result.rows.length ? formatApiKeyRow(result.rows[0]) : null;
+    } catch (error) {
+      console.error('[getAffiliateApiKeyByHash] Database error:', error);
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Revoke an API key for an affiliate
+ */
+export async function revokeAffiliateApiKey(affiliateId: string): Promise<boolean> {
+  const sql = await getDb();
+  if (sql) {
+    try {
+      const now = new Date().toISOString();
+      const result = await sql`
+        UPDATE affiliate_api_keys
+        SET revoked_at = ${now}
+        WHERE affiliate_id = ${affiliateId}
+        AND revoked_at IS NULL
+        RETURNING id
+      `;
+      return result.rows.length > 0;
+    } catch (error) {
+      console.error('[revokeAffiliateApiKey] Database error:', error);
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Get 30-day referred revenue for tier calculation
+ */
+export async function getAffiliateReferredRevenue(
+  affiliateId: string,
+  daysBack: number = 30
+): Promise<number> {
+  const sql = await getDb();
+  if (!sql) return 0;
+  
+  try {
+    const date30DaysAgo = new Date();
+    date30DaysAgo.setDate(date30DaysAgo.getDate() - daysBack);
+    
+    const result = await sql`
+      SELECT COALESCE(SUM(amount_cents), 0) as total
+      FROM affiliate_conversions
+      WHERE affiliate_id = ${affiliateId}
+      AND status = 'completed'
+      AND created_at >= ${date30DaysAgo.toISOString()}
+    `;
+    
+    return result.rows[0]?.total || 0;
+  } catch (error) {
+    console.error('[getAffiliateReferredRevenue] Database error:', error);
+    return 0;
+  }
+}
+
+/**
+ * Calculate affiliate tier based on 30-day referred revenue
+ */
+export function calculateAffiliateTier(referredRevenueInCents: number): number {
+  const referredRevenueDollars = referredRevenueInCents / 100;
+  
+  // Tier thresholds
+  if (referredRevenueDollars >= 10000) return 5; // Tier 5: 23%
+  if (referredRevenueDollars >= 5000) return 4;  // Tier 4: 21%
+  if (referredRevenueDollars >= 2000) return 3;  // Tier 3: 18%
+  if (referredRevenueDollars >= 500) return 2;   // Tier 2: 14%
+  return 1; // Tier 1: 10%
+}
+
+/**
+ * Get commission rate for a tier
+ */
+export function getTierCommissionRate(tier: number): number {
+  const rates: Record<number, number> = {
+    5: 0.23,
+    4: 0.21,
+    3: 0.18,
+    2: 0.14,
+    1: 0.10,
+  };
+  return rates[tier] || 0.10;
 }
