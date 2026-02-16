@@ -14,7 +14,14 @@ export default function ScheduleCalendar({ entries, startDate, durationDays }: S
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // Build calendar grid
-  const calendarDays = [];
+  type CalendarDay = {
+    date: string;
+    dayName: string;
+    dayNum: number;
+    isScheduled: boolean;
+  };
+
+  const calendarDays: CalendarDay[] = [];
   for (let i = 0; i < durationDays; i++) {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
@@ -28,8 +35,8 @@ export default function ScheduleCalendar({ entries, startDate, durationDays }: S
   }
 
   // Group by weeks
-  const weeks: typeof calendarDays[][] = [];
-  let currentWeek: typeof calendarDays[] = [];
+  const weeks: CalendarDay[][] = [];
+  let currentWeek: CalendarDay[] = [];
 
   for (let i = 0; i < calendarDays.length; i++) {
     currentWeek.push(calendarDays[i]);
