@@ -196,20 +196,26 @@ export default function AffiliateDashboard() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Product</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Sale Value</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Order ID</th>
+                <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-600">Sale Value</th>
                 <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-600">Commission</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {conversions.map((conv, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 text-sm text-slate-900">{formatDate(conv.date)}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{conv.productName}</td>
-                  <td className="px-6 py-4 text-sm text-slate-900 font-semibold">{formatCurrency(conv.saleCents)}</td>
-                  <td className="px-6 py-4 text-right text-sm text-emerald-700 font-bold">{formatCurrency(conv.commissionCents)}</td>
+              {conversions.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-600">No conversions yet</td>
                 </tr>
-              ))}
+              ) : (
+                conversions.map((conv, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-6 py-4 text-sm text-slate-900">{formatDate(conv.createdAt)}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 font-mono">{conv.orderId.slice(0, 8)}…</td>
+                    <td className="px-6 py-4 text-right text-sm text-slate-900 font-semibold">{formatCurrency(conv.amountCents)}</td>
+                    <td className="px-6 py-4 text-right text-sm text-emerald-700 font-bold">{formatCurrency(conv.commissionCents)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -222,26 +228,32 @@ export default function AffiliateDashboard() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Amount</th>
+                <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-600">Amount</th>
                 <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Method</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Reference</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {payouts.map((payout, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 text-sm text-slate-900">{formatDate(payout.date)}</td>
-                  <td className="px-6 py-4 text-sm text-slate-900 font-semibold">{formatCurrency(payout.amountCents)}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                      payout.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {payout.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{payout.method}</td>
+              {payouts.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-600">No payouts yet</td>
                 </tr>
-              ))}
+              ) : (
+                payouts.map((payout, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-6 py-4 text-sm text-slate-900">{formatDate(payout.createdAt)}</td>
+                    <td className="px-6 py-4 text-right text-sm text-slate-900 font-semibold">{formatCurrency(payout.amountCents)}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                        payout.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {payout.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{payout.reference || '—'}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
