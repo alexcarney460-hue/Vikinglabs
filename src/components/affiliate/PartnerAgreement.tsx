@@ -141,7 +141,7 @@ export default function PartnerAgreement() {
           <div>
             <p className="text-white/80 text-sm font-medium uppercase tracking-wide">Commission Rate</p>
             <div className="flex items-baseline gap-1 mt-2">
-              <span className="text-4xl font-bold">{typeof affiliate.commissionRate === 'number' ? affiliate.commissionRate : 0}</span>
+              <span className="text-4xl font-bold">{typeof affiliate.commissionRate === 'number' ? (affiliate.commissionRate < 1 ? Math.round(affiliate.commissionRate * 100) : affiliate.commissionRate) : 0}</span>
               <span className="text-2xl">%</span>
             </div>
           </div>
