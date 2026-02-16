@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authjs/options';
 import { getAffiliateByEmail } from '@/lib/affiliates';
+import { authenticateAffiliate } from '@/lib/affiliate-auth';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -134,44 +135,14 @@ const DEFAULT_VIDEOS = [
   },
 ];
 
-function getAuthToken(req: NextRequest): string | null {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-  return null;
-}
-
 export async function GET(req: NextRequest) {
-  // Session OR Bearer token auth
-  const bearerToken = getAuthToken(req);
-  let userEmail: string | undefined;
-
-  if (bearerToken) {
-    // For Bearer tokens, we'd need a token validation system
-    // For now, we require Session auth, but accept Bearer tokens for API clients
-    console.warn('[toolkit] Bearer token auth not fully implemented, falling back to session');
-  }
-
-  const session = await getServerSession(authOptions);
-  userEmail = session?.user?.email as string | undefined;
-
-  if (!session?.user || !userEmail) {
-    return NextResponse.json(
-      { ok: false, error: 'Unauthorized' },
-      { status: 401 }
-    );
+  const auth = await authenticateAffiliate(req);
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
   }
 
   try {
-    // Check if user is an approved affiliate
-    const affiliate = await getAffiliateByEmail(userEmail);
-    if (!affiliate) {
-      return NextResponse.json(
-        { ok: false, error: 'Not an approved affiliate' },
-        { status: 403 }
-      );
-    }
+    const affiliate = auth.affiliate;
 
     const manifest = TOOLKIT_MANIFEST;
 

@@ -1732,7 +1732,19 @@ function formatApiKeyRow(row: any): AffiliateApiKey {
 export async function createAffiliateApiKey(
   affiliateId: string
 ): Promise<{ key: string; keyRecord: AffiliateApiKey }> {
-  await ensureAffiliateTables();
+  console.log('[createAffiliateApiKey] Starting for affiliateId:', affiliateId);
+  
+  // First, verify the affiliate exists and is approved
+  const affiliate = await getAffiliateById(affiliateId);
+  console.log('[createAffiliateApiKey] Affiliate lookup result:', affiliate ? { id: affiliate.id, status: affiliate.status, email: affiliate.email } : 'null');
+  
+  if (!affiliate) {
+    throw new Error('Affiliate not found');
+  }
+  
+  if (affiliate.status !== 'approved') {
+    throw new Error(`Affiliate not approved. Current status: ${affiliate.status}`);
+  }
   
   // Generate a random 32-byte key
   const randomBytes = crypto.randomBytes(32);
@@ -1746,26 +1758,71 @@ export async function createAffiliateApiKey(
   const id = crypto.randomUUID();
   const scopes = ['read:affiliate'];
   
+  console.log('[createAffiliateApiKey] Generated key data:', { id, affiliateId, last4, hashLength: hash.length });
+  
+  // Try Supabase first (primary database)
+  const supabase = getSupabase();
+  console.log('[createAffiliateApiKey] getSupabase() returned:', supabase ? 'client' : 'null');
+  
+  if (supabase) {
+    try {
+      // Ensure the table exists by attempting a create-if-not-exists via rpc or just insert
+      console.log('[createAffiliateApiKey] Inserting into Supabase with data:', { id, affiliate_id: affiliateId, last4 });
+      const { data, error } = await supabase
+        .from('affiliate_api_keys')
+        .insert({
+          id,
+          affiliate_id: affiliateId,
+          hash,
+          last4,
+          scopes: '{read:affiliate}',
+          created_at: now,
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('[createAffiliateApiKey] Supabase insert error:', JSON.stringify(error));
+        // Don't throw yet - fall through to SQL fallback
+      } else {
+        console.log('[createAffiliateApiKey] Supabase insert successful');
+        return {
+          key,
+          keyRecord: formatApiKeyRow(data),
+        };
+      }
+    } catch (error) {
+      console.error('[createAffiliateApiKey] Supabase exception:', error);
+      // Fall through to SQL fallback
+    }
+  }
+  
+  // Fallback to @vercel/postgres
   const sql = await getDb();
+  console.log('[createAffiliateApiKey] getDb() returned:', sql ? 'SQL client' : 'null');
+  
   if (sql) {
     try {
+      await ensureAffiliateTables();
+      console.log('[createAffiliateApiKey] Attempting SQL insert...');
       const result = await sql`
         INSERT INTO affiliate_api_keys (id, affiliate_id, hash, last4, scopes, created_at)
-        VALUES (${id}, ${affiliateId}, ${hash}, ${last4}, ${scopes}, ${now})
+        VALUES (${id}, ${affiliateId}::uuid, ${hash}, ${last4}, ${scopes}, ${now})
         RETURNING *
       `;
+      console.log('[createAffiliateApiKey] SQL insert successful, rows:', result.rows.length);
       return {
         key,
         keyRecord: formatApiKeyRow(result.rows[0]),
       };
     } catch (error) {
-      console.error('[createAffiliateApiKey] Database error:', error);
-      throw error;
+      console.error('[createAffiliateApiKey] SQL error:', error);
+      throw new Error(`Database insert failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
   
-  // Fallback: in-memory storage (not suitable for production)
-  throw new Error('Database not available for API key creation');
+  console.error('[createAffiliateApiKey] No database available. SUPABASE_URL set:', !!process.env.SUPABASE_URL, 'NEXT_PUBLIC_SUPABASE_URL set:', !!process.env.NEXT_PUBLIC_SUPABASE_URL, 'POSTGRES_URL set:', !!process.env.POSTGRES_URL);
+  throw new Error('No database connection available. Check SUPABASE_URL or POSTGRES_URL environment variables.');
 }
 
 /**
@@ -1785,7 +1842,26 @@ export async function getAffiliateApiKeyByAffiliateId(
       `;
       return result.rows.length ? formatApiKeyRow(result.rows[0]) : null;
     } catch (error) {
-      console.error('[getAffiliateApiKeyByAffiliateId] Database error:', error);
+      console.error('[getAffiliateApiKeyByAffiliateId] SQL error:', error);
+    }
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_api_keys')
+        .select('*')
+        .eq('affiliate_id', affiliateId)
+        .is('revoked_at', null)
+        .limit(1)
+        .single();
+      
+      if (error?.code === 'PGRST116') return null; // No rows
+      if (error) throw error;
+      return data ? formatApiKeyRow(data) : null;
+    } catch (error) {
+      console.error('[getAffiliateApiKeyByAffiliateId] Supabase error:', error);
       return null;
     }
   }
@@ -1807,7 +1883,26 @@ export async function getAffiliateApiKeyByHash(hash: string): Promise<AffiliateA
       `;
       return result.rows.length ? formatApiKeyRow(result.rows[0]) : null;
     } catch (error) {
-      console.error('[getAffiliateApiKeyByHash] Database error:', error);
+      console.error('[getAffiliateApiKeyByHash] SQL error:', error);
+    }
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_api_keys')
+        .select('*')
+        .eq('hash', hash)
+        .is('revoked_at', null)
+        .limit(1)
+        .single();
+      
+      if (error?.code === 'PGRST116') return null; // No rows
+      if (error) throw error;
+      return data ? formatApiKeyRow(data) : null;
+    } catch (error) {
+      console.error('[getAffiliateApiKeyByHash] Supabase error:', error);
       return null;
     }
   }
@@ -1831,7 +1926,24 @@ export async function revokeAffiliateApiKey(affiliateId: string): Promise<boolea
       `;
       return result.rows.length > 0;
     } catch (error) {
-      console.error('[revokeAffiliateApiKey] Database error:', error);
+      console.error('[revokeAffiliateApiKey] SQL error:', error);
+    }
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('affiliate_api_keys')
+        .update({ revoked_at: now })
+        .eq('affiliate_id', affiliateId)
+        .is('revoked_at', null);
+      
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('[revokeAffiliateApiKey] Supabase error:', error);
       return false;
     }
   }

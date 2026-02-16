@@ -5,38 +5,40 @@ import {
   createAffiliateApiKey,
   getAffiliateApiKeyByAffiliateId,
   revokeAffiliateApiKey,
-  getAffiliateApiKeyByHash,
   getAffiliateByEmail,
 } from '@/lib/affiliates';
 import { hasUserEmail } from '@/lib/session-guards';
+import { authenticateAffiliate } from '@/lib/affiliate-auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+/**
+ * Helper to get affiliate from session or Bearer token.
+ * Keys management requires session auth for POST/DELETE (security),
+ * but GET supports Bearer tokens too.
+ */
+async function getAffiliateFromSession(req: NextRequest) {
   const session = await getServerSession(authOptions);
+  if (!hasUserEmail(session)) return null;
+  const email = session?.user?.email;
+  if (!email) return null;
+  return getAffiliateByEmail(email);
+}
 
-  if (!hasUserEmail(session)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req: NextRequest) {
+  // Support both session and Bearer token auth for listing keys
+  const auth = await authenticateAffiliate(req);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   try {
-    const email = session?.user?.email;
-    if (!email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const affiliate = await getAffiliateByEmail(email);
-    if (!affiliate) {
-      return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 });
-    }
-
-    const apiKey = await getAffiliateApiKeyByAffiliateId(affiliate.id);
+    const apiKey = await getAffiliateApiKeyByAffiliateId(auth.affiliate.id);
 
     if (!apiKey) {
       return NextResponse.json({ keys: [] });
     }
 
-    // Don't expose the full hash, only last 4 chars
     return NextResponse.json({
       keys: [
         {
@@ -49,84 +51,46 @@ export async function GET(req: NextRequest) {
       ],
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch API keys' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch API keys' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  // Key creation requires session auth only (not Bearer) for security
   const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
 
-  if (!hasUserEmail(session)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const affiliate = await getAffiliateByEmail(session.user.email);
+  if (!affiliate) {
+    return NextResponse.json({ error: 'Not an approved affiliate. Please apply at /affiliates/apply' }, { status: 403 });
   }
 
   try {
-    const email = session?.user?.email;
-    if (!email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const affiliate = await getAffiliateByEmail(email);
-    if (!affiliate) {
-      return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 });
-    }
+    const body = await req.json();
+    const { name } = body;
 
     const { key, keyRecord } = await createAffiliateApiKey(affiliate.id);
 
-    // Only show the raw key once
     return NextResponse.json(
       {
         message: 'API key created successfully. Save this key - you will not see it again.',
-        key, // Raw key shown only at creation
+        key,
         keyRecord: {
           id: keyRecord.id,
           last4: keyRecord.last4,
           createdAt: keyRecord.createdAt,
           scopes: keyRecord.scopes,
+          name: name || `Key ${keyRecord.last4}`,
         },
       },
       { status: 201 }
     );
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to create API key' },
-      { status: 500 }
-    );
+    console.error('[POST /api/affiliate/keys]', error);
+    return NextResponse.json({ error: `Failed to create API key: ${error instanceof Error ? error.message : 'Unknown error'}` }, { status: 500 });
   }
 }
 
-export async function DELETE(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-
-  if (!hasUserEmail(session)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  try {
-    const email = session?.user?.email;
-    if (!email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const affiliate = await getAffiliateByEmail(email);
-    if (!affiliate) {
-      return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 });
-    }
-
-    const success = await revokeAffiliateApiKey(affiliate.id);
-
-    if (!success) {
-      return NextResponse.json({ error: 'No API key found to revoke' }, { status: 404 });
-    }
-
-    return NextResponse.json({ message: 'API key revoked successfully' });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to revoke API key' },
-      { status: 500 }
-    );
-  }
-}
+// DELETE moved to /api/affiliate/keys/[id]/route.ts for proper dynamic routing
