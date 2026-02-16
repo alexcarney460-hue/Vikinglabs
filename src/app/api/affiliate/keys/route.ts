@@ -20,7 +20,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const affiliate = await getAffiliateByEmail(session.user.email);
+    const email = session?.user?.email;
+    if (!email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const affiliate = await getAffiliateByEmail(email);
     if (!affiliate) {
       return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 });
     }
@@ -59,7 +64,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const affiliate = await getAffiliateByEmail(session.user.email);
+    const email = session?.user?.email;
+    if (!email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const affiliate = await getAffiliateByEmail(email);
     if (!affiliate) {
       return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 });
     }
@@ -96,7 +106,12 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const affiliate = await getAffiliateByEmail(session.user.email);
+    const email = session?.user?.email;
+    if (!email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const affiliate = await getAffiliateByEmail(email);
     if (!affiliate) {
       return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 });
     }
