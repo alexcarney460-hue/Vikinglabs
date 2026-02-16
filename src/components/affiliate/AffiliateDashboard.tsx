@@ -25,11 +25,9 @@ export default function AffiliateDashboard() {
   const [conversions, setConversions] = useState<AffiliateConversion[]>([]);
   const [payouts, setPayouts] = useState<AffiliatePayout[]>([]);
   const [toolkit, setToolkit] = useState<Toolkit | null>(null);
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'conversions' | 'payouts' | 'toolkit' | 'api-keys'>('overview');
-  const [apiKeys, setApiKeys] = useState<any[]>([]);
-  const [newKeyName, setNewKeyName] = useState('');
-  const [creatingKey, setCreatingKey] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
   useEffect(() => {
@@ -110,7 +108,6 @@ export default function AffiliateDashboard() {
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="space-y-8">
-          {/* KPI Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
               label="Total Sales"
@@ -138,14 +135,12 @@ export default function AffiliateDashboard() {
             />
           </div>
 
-          {/* Last 30 Days */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Last 30 Days</h3>
             <p className="mt-2 text-3xl font-black text-slate-900">{formatCurrency(summary.last30dSalesCents)}</p>
             <p className="mt-1 text-sm text-slate-600">in attributed sales</p>
           </div>
 
-          {/* Affiliate Link & Code */}
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <label className="text-xs font-bold uppercase tracking-wide text-slate-900">Your Affiliate Code</label>
@@ -154,48 +149,41 @@ export default function AffiliateDashboard() {
                   type="text"
                   value={summary.code || ''}
                   readOnly
-                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-slate-900"
+                  className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 font-mono text-sm text-slate-900"
                 />
                 <button
                   onClick={() => copyToClipboard(summary.code || '', 'code')}
-                  className={`rounded-xl px-4 py-3 font-bold text-white transition-all ${
+                  className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
                     copiedRef === 'code'
-                      ? 'bg-emerald-600 hover:bg-emerald-700'
-                      : 'bg-amber-500 hover:bg-amber-600'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   {copiedRef === 'code' ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
-              <p className="mt-3 text-xs text-slate-600">Share this code with your audience for trackable sales.</p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <label className="text-xs font-bold uppercase tracking-wide text-slate-900">Your Affiliate Link</label>
+              <label className="text-xs font-bold uppercase tracking-wide text-slate-900">Tracking Link</label>
               <div className="mt-4 flex items-center gap-3">
                 <input
                   type="text"
-                  value={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co'}?ref=${summary.code || 'code'}`}
+                  value={`https://vikinglabs.co?ref=${summary.code}`}
                   readOnly
-                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-900 overflow-hidden"
+                  className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 font-mono text-sm text-slate-900"
                 />
                 <button
-                  onClick={() =>
-                    copyToClipboard(
-                      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co'}?ref=${summary.code || 'code'}`,
-                      'link'
-                    )
-                  }
-                  className={`rounded-xl px-4 py-3 font-bold text-white transition-all ${
+                  onClick={() => copyToClipboard(`https://vikinglabs.co?ref=${summary.code}`, 'link')}
+                  className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
                     copiedRef === 'link'
-                      ? 'bg-emerald-600 hover:bg-emerald-700'
-                      : 'bg-amber-500 hover:bg-amber-600'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   {copiedRef === 'link' ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
-              <p className="mt-3 text-xs text-slate-600">Direct link to the store with your referral tracking.</p>
             </div>
           </div>
         </div>
@@ -204,277 +192,138 @@ export default function AffiliateDashboard() {
       {/* Conversions Tab */}
       {activeTab === 'conversions' && (
         <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Recent Conversions</h3>
-            <p className="mt-1 text-slate-600">Orders attributed to your referral link or code.</p>
-          </div>
-          {conversions.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-bold text-slate-900">Date</th>
-                    <th className="px-6 py-3 text-left font-bold text-slate-900">Order ID</th>
-                    <th className="px-6 py-3 text-right font-bold text-slate-900">Amount</th>
-                    <th className="px-6 py-3 text-right font-bold text-slate-900">Commission</th>
-                    <th className="px-6 py-3 text-left font-bold text-slate-900">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {conversions.map((c) => (
-                    <tr key={c.id} className="border-b border-slate-200 hover:bg-slate-50">
-                      <td className="px-6 py-4 text-slate-700">{formatDate(c.createdAt)}</td>
-                      <td className="px-6 py-4 font-mono text-slate-700">{c.orderId.slice(0, 12)}</td>
-                      <td className="px-6 py-4 text-right text-slate-700 font-bold">{formatCurrency(c.amountCents)}</td>
-                      <td className="px-6 py-4 text-right text-emerald-700 font-bold">{formatCurrency(c.commissionCents)}</td>
-                      <td className="px-6 py-4">
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                          {c.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-8 text-center text-slate-600">
-              <p>No conversions yet. Start sharing your code and link!</p>
-            </div>
-          )}
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Date</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Product</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Sale Value</th>
+                <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-600">Commission</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {conversions.map((conv, i) => (
+                <tr key={i} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm text-slate-900">{formatDate(conv.date)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{conv.productName}</td>
+                  <td className="px-6 py-4 text-sm text-slate-900 font-semibold">{formatCurrency(conv.saleCents)}</td>
+                  <td className="px-6 py-4 text-right text-sm text-emerald-700 font-bold">{formatCurrency(conv.commissionCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* Payouts Tab */}
       {activeTab === 'payouts' && (
         <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Payout History</h3>
-            <p className="mt-1 text-slate-600">Track your commission payouts and status.</p>
-          </div>
-          {payouts.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-bold text-slate-900">Date</th>
-                    <th className="px-6 py-3 text-right font-bold text-slate-900">Amount</th>
-                    <th className="px-6 py-3 text-left font-bold text-slate-900">Status</th>
-                    <th className="px-6 py-3 text-left font-bold text-slate-900">Reference</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payouts.map((p) => (
-                    <tr key={p.id} className="border-b border-slate-200 hover:bg-slate-50">
-                      <td className="px-6 py-4 text-slate-700">{formatDate(p.createdAt)}</td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-700">{formatCurrency(p.amountCents)}</td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-bold ${
-                            p.status === 'completed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : p.status === 'processing'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-800'
-                          }`}
-                        >
-                          {p.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-slate-600">{p.reference || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-8 text-center text-slate-600">
-              <p>No payouts yet. Earn commissions and request a payout!</p>
-            </div>
-          )}
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Date</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Amount</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-600">Method</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {payouts.map((payout, i) => (
+                <tr key={i} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm text-slate-900">{formatDate(payout.date)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-900 font-semibold">{formatCurrency(payout.amountCents)}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                      payout.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {payout.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{payout.method}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* Toolkit Tab */}
-      {activeTab === 'toolkit' && (
+      {activeTab === 'toolkit' && toolkit && (
         <div className="space-y-8">
-          {toolkit && (
-            <>
-              {/* Brand Assets */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Brand Assets</h3>
-                <p className="mt-1 text-sm text-slate-600">Use these assets to promote Viking Labs professionally.</p>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  {toolkit.brandAssets.map((asset) => (
-                    <div key={asset.id} className="rounded-lg border border-slate-200 p-4">
-                      <p className="text-sm font-bold text-slate-900">{asset.name}</p>
-                      <p className="mt-1 text-xs text-slate-600">{asset.description}</p>
-                      <a
-                        href={`/${asset.filename}`}
-                        download
-                        className="mt-3 inline-block rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600"
-                      >
-                        Download
-                      </a>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Marketing Templates</h3>
+            <div className="mt-6 grid gap-6">
+              {toolkit.templates.map((template) => (
+                <div key={template.id} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-slate-900">{template.name}</p>
+                      <p className="mt-1 text-xs text-slate-600">{template.category}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Copy Templates */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Copy Templates</h3>
-                <p className="mt-1 text-sm text-slate-600">Ready-made messages you can customize and share.</p>
-                <div className="mt-6 space-y-4">
-                  {toolkit.templates.map((template) => (
-                    <div key={template.id} className="rounded-lg border border-slate-200 p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <p className="text-sm font-bold text-slate-900">{template.name}</p>
-                          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{template.contentWithLink}</p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(template.contentWithLink, template.id)}
-                          className={`rounded-lg px-4 py-2 text-xs font-bold text-white transition-all whitespace-nowrap ${
-                            copiedRef === template.id
-                              ? 'bg-emerald-600'
-                              : 'bg-amber-500 hover:bg-amber-600'
-                          }`}
-                        >
-                          {copiedRef === template.id ? '✓ Copied' : 'Copy'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Guidelines */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Guidelines</h3>
-                <p className="mt-1 text-sm text-slate-600">Promotion best practices to keep content professional.</p>
-                <div className="mt-6 grid gap-6 lg:grid-cols-2">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">✓ Do</p>
-                    <ul className="mt-3 space-y-2">
-                      {toolkit.guidelines.do.map((item: string, i: number) => (
-                        <li key={i} className="text-sm text-slate-700">• {item}</li>
-                      ))}
-                    </ul>
+                    <button
+                      onClick={() => copyToClipboard(template.contentWithLink, template.id)}
+                      className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                        copiedRef === template.id
+                          ? 'bg-emerald-600'
+                          : 'bg-amber-500 hover:bg-amber-600'
+                      }`}
+                    >
+                      {copiedRef === template.id ? '✓ Copied' : 'Copy'}
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-red-700">✗ Don't</p>
-                    <ul className="mt-3 space-y-2">
-                      {toolkit.guidelines.dont.map((item: string, i: number) => (
-                        <li key={i} className="text-sm text-slate-700">• {item}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  <p className="text-sm text-slate-700">{template.content}</p>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Guidelines</h3>
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">✓ Do</p>
+                <ul className="mt-3 space-y-2">
+                  {toolkit.guidelines.do.map((item: string, i: number) => (
+                    <li key={i} className="text-sm text-slate-700">• {item}</li>
+                  ))}
+                </ul>
               </div>
-            </>
-          )}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-red-700">✗ Don't</p>
+                <ul className="mt-3 space-y-2">
+                  {toolkit.guidelines.dont.map((item: string, i: number) => (
+                    <li key={i} className="text-sm text-slate-700">• {item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* API Keys Tab */}
       {activeTab === 'api-keys' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="flex items-start justify-between gap-4 mb-6">
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">API Keys</h3>
-                <p className="mt-2 text-sm text-slate-600">Create and manage API keys for accessing affiliate resources programmatically.</p>
-              </div>
-            </div>
-
-            {/* Create Key Form */}
-            <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-6">
-              <h4 className="font-bold text-slate-900">Create New Key</h4>
-              <div className="mt-4 flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Key name (e.g., 'Dashboard', 'Integrations')"
-                  value={newKeyName}
-                  onChange={(e) => setNewKeyName(e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500"
-                />
-                <button
-                  onClick={async () => {
-                    if (!newKeyName.trim()) return;
-                    setCreatingKey(true);
-                    try {
-                      const res = await fetch('/api/affiliate/keys', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: newKeyName }),
-                      });
-                      if (res.ok) {
-                        const data = await res.json();
-                        setApiKeys([...apiKeys, data.key]);
-                        setNewKeyName('');
-                        alert(`Key created! Store it safely:\n\n${data.key.secret}\n\nYou won't be able to see it again.`);
-                      }
-                    } finally {
-                      setCreatingKey(false);
-                    }
-                  }}
-                  disabled={creatingKey || !newKeyName.trim()}
-                  className="rounded-lg bg-amber-500 px-6 py-2 font-bold text-white hover:bg-amber-600 disabled:opacity-50"
-                >
-                  {creatingKey ? 'Creating…' : 'Create'}
-                </button>
-              </div>
-            </div>
-
-            {/* Keys List */}
-            {apiKeys.length === 0 ? (
-              <p className="text-sm text-slate-600">No API keys yet. Create one to get started.</p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase text-slate-600">Your Keys ({apiKeys.length})</p>
-                {apiKeys.map((key, idx) => (
-                  <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <div>
-                      <p className="font-semibold text-slate-900">{key.name || 'Unnamed'}</p>
-                      <p className="text-xs text-slate-500">ID: {key.id.slice(0, 12)}…</p>
-                      <p className="text-xs text-slate-500">Created: {new Date(key.createdAt).toLocaleDateString()}</p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        if (!confirm('Revoke this key? It cannot be undone.')) return;
-                        try {
-                          const res = await fetch(`/api/affiliate/keys/${key.id}`, { method: 'DELETE' });
-                          if (res.ok) {
-                            setApiKeys(apiKeys.filter((k) => k.id !== key.id));
-                          }
-                        } catch (err) {
-                          console.error('Error revoking key:', err);
-                        }
-                      }}
-                      className="rounded-lg bg-red-100 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-200"
-                    >
-                      Revoke
-                    </button>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900 mb-6">API Keys</h3>
+          <p className="text-sm text-slate-600 mb-6">Create and manage API keys for programmatic access to affiliate resources.</p>
+          
+          {apiKeys.length === 0 ? (
+            <p className="text-sm text-slate-600">No API keys yet. Check back when the API key endpoint is implemented.</p>
+          ) : (
+            <div className="space-y-3">
+              {apiKeys.map((key: any, idx: number) => (
+                <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-900">{key.name || 'Unnamed'}</p>
+                    <p className="text-xs text-slate-500">ID: {key.id.slice(0, 12)}…</p>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Usage Info */}
-            <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <h4 className="font-bold text-slate-900">API Documentation</h4>
-              <p className="mt-2 text-sm text-slate-600">
-                Use your API key as Bearer token in the Authorization header:
-              </p>
-              <code className="mt-4 block rounded-lg bg-slate-800 px-4 py-3 text-xs font-mono text-slate-100 overflow-x-auto">
-                Authorization: Bearer &lt;your_api_key&gt;
-              </code>
-              <p className="mt-4 text-sm text-slate-600">
-                Endpoints: <code className="bg-slate-200 px-2 py-1 rounded text-xs font-mono">/api/affiliate/summary</code>, 
-                <code className="bg-slate-200 px-2 py-1 rounded text-xs font-mono ml-2">/api/affiliate/conversions</code>,
-                <code className="bg-slate-200 px-2 py-1 rounded text-xs font-mono ml-2">/api/affiliate/toolkit</code>
-              </p>
+                  <button className="rounded-lg bg-red-100 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-200">
+                    Revoke
+                  </button>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
