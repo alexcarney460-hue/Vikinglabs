@@ -5,6 +5,7 @@ import { readJson, writeJson } from './storage';
 import { sendTelegramAdminAlert } from './telegram';
 import { sendDiscordAffiliateInvite } from './discord';
 import { buildAffiliateCodeSeed, formatAffiliateCode } from './affiliate-utils';
+import { getSupabase } from './supabase';
 
 export type AffiliateStatus = 'pending' | 'approved' | 'declined' | 'needs_info';
 
@@ -225,6 +226,40 @@ export async function createAffiliateApplication(input: {
     updatedAt: now,
   };
 
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    await ensureAffiliateTables();
+    try {
+      const { error } = await supabase.from('affiliate_applications').insert([{
+        id: record.id,
+        name: record.name,
+        email: record.email,
+        social_handle: record.socialHandle,
+        audience_size: record.audienceSize,
+        channels: record.channels,
+        notes: record.notes,
+        status: record.status,
+        code: record.code,
+        signup_credit_cents: record.signupCreditCents,
+        commission_rate: record.commissionRate,
+        approved_at: record.approvedAt,
+        expires_at: record.expiresAt,
+        declined_at: record.declinedAt,
+        requested_info_at: record.requestedInfoAt,
+        discord_user_id: record.discordUserId,
+        created_at: record.createdAt,
+        updated_at: record.updatedAt,
+      }]);
+
+      if (error) throw error;
+      return record;
+    } catch (dbError) {
+      console.error('Affiliate Supabase insert failed:', dbError);
+    }
+  }
+
+  // Try @vercel/postgres
   const sql = await getDb();
   if (sql) {
     await ensureAffiliateTables();
@@ -248,6 +283,46 @@ export async function createAffiliateApplication(input: {
 }
 
 export async function listAffiliateApplications(status?: AffiliateStatus): Promise<AffiliateApplication[]> {
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    await ensureAffiliateTables();
+    try {
+      const query = supabase.from('affiliate_applications').select('*').order('created_at', { ascending: false });
+      
+      if (status) {
+        query.eq('status', status);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        socialHandle: row.social_handle,
+        audienceSize: row.audience_size,
+        channels: row.channels,
+        notes: row.notes,
+        status: row.status,
+        code: row.code,
+        signupCreditCents: row.signup_credit_cents,
+        commissionRate: row.commission_rate,
+        approvedAt: row.approved_at,
+        expiresAt: row.expires_at,
+        declinedAt: row.declined_at,
+        requestedInfoAt: row.requested_info_at,
+        discordUserId: row.discord_user_id,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+    } catch (dbError) {
+      console.error('Affiliate Supabase query failed:', dbError);
+    }
+  }
+
+  // Try @vercel/postgres
   const sql = await getDb();
   if (sql) {
     await ensureAffiliateTables();
@@ -309,37 +384,77 @@ export async function getAffiliateByCode(code: string, options?: { requireActive
   const normalized = formatAffiliateCode(code);
   if (!normalized) return null;
 
-  const sql = await getDb();
   let affiliate: AffiliateApplication | null = null;
 
-  if (sql) {
-    const rows = await sql`
-      SELECT id,
-             name,
-             email,
-             social_handle AS "socialHandle",
-             audience_size AS "audienceSize",
-             channels,
-             notes,
-             status,
-             code,
-             signup_credit_cents AS "signupCreditCents",
-             commission_rate AS "commissionRate",
-             approved_at AS "approvedAt",
-             expires_at AS "expiresAt",
-             declined_at AS "declinedAt",
-             requested_info_at AS "requestedInfoAt",
-             discord_user_id AS "discordUserId",
-             created_at AS "createdAt",
-             updated_at AS "updatedAt"
-      FROM affiliate_applications
-      WHERE code = ${normalized}
-      LIMIT 1
-    `;
-    affiliate = (rows.rows[0] as AffiliateApplication) || null;
-  } else {
-    const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
-    affiliate = store.applications.find((app) => app.code === normalized) || null;
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('affiliate_applications')
+        .select('*')
+        .eq('code', normalized)
+        .single();
+
+      if (!error && data) {
+        affiliate = {
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          socialHandle: data.social_handle,
+          audienceSize: data.audience_size,
+          channels: data.channels,
+          notes: data.notes,
+          status: data.status,
+          code: data.code,
+          signupCreditCents: data.signup_credit_cents,
+          commissionRate: data.commission_rate,
+          approvedAt: data.approved_at,
+          expiresAt: data.expires_at,
+          declinedAt: data.declined_at,
+          requestedInfoAt: data.requested_info_at,
+          discordUserId: data.discord_user_id,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        };
+      }
+    } catch (dbError) {
+      console.error('Affiliate Supabase query failed:', dbError);
+    }
+  }
+
+  // Try @vercel/postgres
+  if (!affiliate) {
+    const sql = await getDb();
+    if (sql) {
+      const rows = await sql`
+        SELECT id,
+               name,
+               email,
+               social_handle AS "socialHandle",
+               audience_size AS "audienceSize",
+               channels,
+               notes,
+               status,
+               code,
+               signup_credit_cents AS "signupCreditCents",
+               commission_rate AS "commissionRate",
+               approved_at AS "approvedAt",
+               expires_at AS "expiresAt",
+               declined_at AS "declinedAt",
+               requested_info_at AS "requestedInfoAt",
+               discord_user_id AS "discordUserId",
+               created_at AS "createdAt",
+               updated_at AS "updatedAt"
+        FROM affiliate_applications
+        WHERE code = ${normalized}
+        LIMIT 1
+      `;
+      affiliate = (rows.rows[0] as AffiliateApplication) || null;
+    } else {
+      const store = await readJson<AffiliateStore>(STORAGE_FILE, EMPTY_STORE);
+      affiliate = store.applications.find((app) => app.code === normalized) || null;
+    }
   }
 
   // Check if affiliate is active (approved and not expired)
@@ -360,6 +475,109 @@ export async function updateAffiliateApplication(input: {
 }): Promise<AffiliateApplication | null> {
   const now = new Date().toISOString();
   const desiredStatus = input.status;
+
+  // Try Supabase first
+  const supabase = getSupabase();
+  if (supabase) {
+    await ensureAffiliateTables();
+    try {
+      // Get current record
+      const { data: currentData, error: getError } = await supabase
+        .from('affiliate_applications')
+        .select('name, email, code, social_handle')
+        .eq('id', input.id)
+        .single();
+
+      if (getError || !currentData) return null;
+
+      const current = currentData as { name: string; email: string; code: string | null; social_handle: string | null };
+      let code: string | null = null;
+      let approvedAt: string | null = null;
+      let expiresAt: string | null = null;
+      let declinedAt: string | null = null;
+      let requestedInfoAt: string | null = null;
+
+      if (desiredStatus === 'approved') {
+        code = current.code || (await generateAffiliateCode(current.social_handle, current.name, current.email));
+        approvedAt = now;
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + 60);
+        expiresAt = expiry.toISOString();
+      } else if (desiredStatus === 'declined') {
+        declinedAt = now;
+      } else if (desiredStatus === 'needs_info') {
+        requestedInfoAt = now;
+      }
+
+      const updateData: any = { updated_at: now };
+      if (desiredStatus) updateData.status = desiredStatus;
+      if (code) updateData.code = code;
+      if (input.signupCreditCents !== undefined) updateData.signup_credit_cents = input.signupCreditCents;
+      if (approvedAt) updateData.approved_at = approvedAt;
+      if (expiresAt) updateData.expires_at = expiresAt;
+      if (declinedAt) updateData.declined_at = declinedAt;
+      if (requestedInfoAt) updateData.requested_info_at = requestedInfoAt;
+      if (input.discordUserId !== undefined) updateData.discord_user_id = input.discordUserId;
+
+      const { data: updated, error: updateError } = await supabase
+        .from('affiliate_applications')
+        .update(updateData)
+        .eq('id', input.id)
+        .select()
+        .single();
+
+      if (updateError || !updated) return null;
+
+      const result: AffiliateApplication = {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        socialHandle: updated.social_handle,
+        audienceSize: updated.audience_size,
+        channels: updated.channels,
+        notes: updated.notes,
+        status: updated.status,
+        code: updated.code,
+        signupCreditCents: updated.signup_credit_cents,
+        commissionRate: updated.commission_rate,
+        approvedAt: updated.approved_at,
+        expiresAt: updated.expires_at,
+        declinedAt: updated.declined_at,
+        requestedInfoAt: updated.requested_info_at,
+        discordUserId: updated.discord_user_id,
+        createdAt: updated.created_at,
+        updatedAt: updated.updated_at,
+      };
+
+      if (result && desiredStatus === 'approved') {
+        await notifyAffiliateApproval(result).catch((error) => {
+          console.error('Affiliate approval email failed', error);
+        });
+
+        await sendTelegramAdminAlert(
+          `Affiliate approved: ${result.name} (${result.email})\nCode: ${result.code || 'TBD'}\nExpires: ${result.expiresAt ? new Date(result.expiresAt).toLocaleDateString() : 'N/A'}\nSignup credit: $${(
+            result.signupCreditCents / 100
+          ).toFixed(2)}`
+        ).catch((error) => {
+          console.error('Telegram affiliate approval notification failed', error);
+        });
+
+        if (input.autoInvite && result.discordUserId) {
+          sendDiscordAffiliateInvite({
+            discordUserId: result.discordUserId,
+            affiliateName: result.name,
+            affiliateCode: result.code || undefined,
+          }).catch((error) => {
+            console.error('Discord affiliate invite failed', error);
+          });
+        }
+      }
+
+      return result;
+    } catch (dbError) {
+      console.error('Affiliate Supabase update failed:', dbError);
+    }
+  }
 
   const sql = await getDb();
   if (sql) {
