@@ -55,7 +55,7 @@ export default function AccountClient() {
   const [profile, setProfile] = useState<Profile>({});
   const [saved, setSaved] = useState<ResearchSaved>({ ids: [] });
   const [justSaved, setJustSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'research' | 'affiliate'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'research' | 'tools' | 'affiliate'>('profile');
   const [isAffiliate, setIsAffiliate] = useState(false);
 
   useEffect(() => {
@@ -168,6 +168,16 @@ export default function AccountClient() {
           }`}
         >
           Research Library
+        </button>
+        <button
+          onClick={() => setActiveTab('tools')}
+          className={`px-6 py-3 text-sm font-bold uppercase tracking-wide transition-colors ${
+            activeTab === 'tools'
+              ? 'border-b-2 border-amber-500 text-amber-600'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Tools
         </button>
         {isAffiliate && (
           <button
@@ -316,6 +326,36 @@ export default function AccountClient() {
                 <Link href="/research?saved=1" className="text-sm font-bold text-amber-700 hover:underline">
                   View saved →
                 </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tools Tab */}
+      {activeTab === 'tools' && (
+        <div className="mt-10">
+          <div className="grid gap-6">
+            {/* Stack Optimizer Tool */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">Stack Optimizer</h2>
+                  <p className="mt-2 text-slate-600">
+                    Plan and optimize your research protocol administration schedules with complexity analysis and logistics planning.
+                  </p>
+                </div>
+                <Link
+                  href="/account/tools/stack-optimizer"
+                  className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600 transition-colors whitespace-nowrap"
+                >
+                  Open tool →
+                </Link>
+              </div>
+              <div className="mt-4 flex gap-2 flex-wrap">
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Schedule</span>
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">Planning</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-800">Protocol</span>
               </div>
             </div>
           </div>
