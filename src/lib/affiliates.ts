@@ -1746,8 +1746,6 @@ export async function createAffiliateApiKey(
     throw new Error(`Affiliate not approved. Current status: ${affiliate.status}`);
   }
   
-  await ensureAffiliateTables();
-  
   // Generate a random 32-byte key
   const randomBytes = crypto.randomBytes(32);
   const key = randomBytes.toString('hex');
@@ -1762,12 +1760,50 @@ export async function createAffiliateApiKey(
   
   console.log('[createAffiliateApiKey] Generated key data:', { id, affiliateId, last4, hashLength: hash.length });
   
-  // Try @vercel/postgres first
+  // Try Supabase first (primary database)
+  const supabase = getSupabase();
+  console.log('[createAffiliateApiKey] getSupabase() returned:', supabase ? 'client' : 'null');
+  
+  if (supabase) {
+    try {
+      // Ensure the table exists by attempting a create-if-not-exists via rpc or just insert
+      console.log('[createAffiliateApiKey] Inserting into Supabase with data:', { id, affiliate_id: affiliateId, last4 });
+      const { data, error } = await supabase
+        .from('affiliate_api_keys')
+        .insert({
+          id,
+          affiliate_id: affiliateId,
+          hash,
+          last4,
+          scopes: '{read:affiliate}',
+          created_at: now,
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('[createAffiliateApiKey] Supabase insert error:', JSON.stringify(error));
+        // Don't throw yet - fall through to SQL fallback
+      } else {
+        console.log('[createAffiliateApiKey] Supabase insert successful');
+        return {
+          key,
+          keyRecord: formatApiKeyRow(data),
+        };
+      }
+    } catch (error) {
+      console.error('[createAffiliateApiKey] Supabase exception:', error);
+      // Fall through to SQL fallback
+    }
+  }
+  
+  // Fallback to @vercel/postgres
   const sql = await getDb();
   console.log('[createAffiliateApiKey] getDb() returned:', sql ? 'SQL client' : 'null');
   
   if (sql) {
     try {
+      await ensureAffiliateTables();
       console.log('[createAffiliateApiKey] Attempting SQL insert...');
       const result = await sql`
         INSERT INTO affiliate_api_keys (id, affiliate_id, hash, last4, scopes, created_at)
@@ -1780,50 +1816,13 @@ export async function createAffiliateApiKey(
         keyRecord: formatApiKeyRow(result.rows[0]),
       };
     } catch (error) {
-      console.error('[createAffiliateApiKey] SQL error (falling back to Supabase):', error);
-      // Don't throw, continue to Supabase fallback
+      console.error('[createAffiliateApiKey] SQL error:', error);
+      throw new Error(`Database insert failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
   
-  // Fallback to Supabase
-  console.log('[createAffiliateApiKey] Attempting Supabase fallback...');
-  const supabase = getSupabase();
-  console.log('[createAffiliateApiKey] getSupabase() returned:', supabase ? 'client' : 'null');
-  
-  if (supabase) {
-    try {
-      console.log('[createAffiliateApiKey] Inserting into Supabase with data:', { id, affiliate_id: affiliateId, last4 });
-      const { data, error } = await supabase
-        .from('affiliate_api_keys')
-        .insert({
-          id,
-          affiliate_id: affiliateId,
-          hash,
-          last4,
-          scopes,
-          created_at: now,
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('[createAffiliateApiKey] Supabase insert error:', error);
-        throw error;
-      }
-      
-      console.log('[createAffiliateApiKey] Supabase insert successful:', data);
-      return {
-        key,
-        keyRecord: formatApiKeyRow(data),
-      };
-    } catch (error) {
-      console.error('[createAffiliateApiKey] Supabase error (final):', error);
-      throw error;
-    }
-  }
-  
-  console.error('[createAffiliateApiKey] No database available - both SQL and Supabase failed or are null');
-  throw new Error('Database not available for API key creation');
+  console.error('[createAffiliateApiKey] No database available. SUPABASE_URL set:', !!process.env.SUPABASE_URL, 'NEXT_PUBLIC_SUPABASE_URL set:', !!process.env.NEXT_PUBLIC_SUPABASE_URL, 'POSTGRES_URL set:', !!process.env.POSTGRES_URL);
+  throw new Error('No database connection available. Check SUPABASE_URL or POSTGRES_URL environment variables.');
 }
 
 /**
