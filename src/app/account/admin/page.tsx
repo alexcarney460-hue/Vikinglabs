@@ -10,7 +10,7 @@ export default function AdminPage() {
         </p>
       </div>
 
-      <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-sm font-black uppercase tracking-wide text-slate-900">Library Admin</h3>
           <p className="mt-2 text-sm text-slate-600">Create/edit research items, upload PDFs/COAs, publish.</p>
@@ -46,6 +46,19 @@ export default function AdminPage() {
               className="text-sm font-semibold text-amber-600 hover:text-amber-700"
             >
               Open analytics →
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-sm font-black uppercase tracking-wide text-slate-900">Accounting</h3>
+          <p className="mt-2 text-sm text-slate-600">Orders, refunds, revenue, affiliate payouts, and financial reports.</p>
+          <div className="mt-5">
+            <Link
+              href="/account/admin/accounting"
+              className="text-sm font-semibold text-amber-600 hover:text-amber-700"
+            >
+              Open accounting →
             </Link>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { getSupabase, hasSupabase } from './supabase';
 import { ensureDatabaseEnv } from './db-env';
 
 type SqlTag = (strings: TemplateStringsArray, ...values: any[]) => Promise<any>;
@@ -11,26 +12,32 @@ function getConnectionUrl(): string | undefined {
 
 function isPooledConnectionString(url: string): boolean {
   const lowered = url.toLowerCase();
-  // Prisma Accelerate URLs are NOT direct postgres connections
   if (lowered.startsWith('prisma+postgres://')) return false;
   if (lowered.includes('db.prisma.io')) return false;
-  // Neon/Supabase pooled connections
   if (lowered.includes('-pooler.') || lowered.includes(':6543')) return true;
   if (lowered.includes('pgbouncer=true')) return true;
   return false;
 }
 
 export function hasPooledDatabase() {
-  return !!getConnectionUrl();
+  return hasSupabase() || !!getConnectionUrl();
 }
 
+/**
+ * Get a raw SQL tag function. Prefers @vercel/postgres if POSTGRES_URL is set,
+ * otherwise returns null (callers should use getSupabase() for Supabase projects).
+ */
 export async function getSql(): Promise<SqlTag | null> {
   if (cachedSql !== undefined) return cachedSql;
 
   const dbUrl = getConnectionUrl();
   if (!dbUrl) {
-    console.error('[db] No database URL found. Checked POSTGRES_URL, DATABASE_URL');
-    console.error('[db] Available env keys:', Object.keys(process.env).filter(k => /postgres|database|prisma/i.test(k)).join(', '));
+    // No direct Postgres URL — if Supabase is configured, callers should use getSupabase()
+    if (hasSupabase()) {
+      console.log('[db] No POSTGRES_URL, but Supabase is configured. Use getSupabase() for queries.');
+    } else {
+      console.error('[db] No database URL found. Checked POSTGRES_URL, DATABASE_URL, SUPABASE_URL');
+    }
     cachedSql = null;
     return null;
   }
@@ -40,19 +47,16 @@ export async function getSql(): Promise<SqlTag | null> {
     const masked = dbUrl.substring(0, 30) + '...';
 
     if (isPooledConnectionString(dbUrl)) {
-      // Pooled connection — use createPool
       console.log('[db] Using pooled connection:', masked);
       const pool = mod.createPool({ connectionString: dbUrl });
       cachedSql = pool.sql.bind(pool) as SqlTag;
     } else {
-      // Direct connection — must use createClient (NOT createPool or sql tag)
       console.log('[db] Using direct connection (createClient):', masked);
       const client = mod.createClient({ connectionString: dbUrl });
       await client.connect();
       cachedSql = client.sql.bind(client) as SqlTag;
     }
 
-    // Verify connectivity
     await cachedSql`SELECT 1`;
     console.log('[db] Database connection verified');
     return cachedSql;
