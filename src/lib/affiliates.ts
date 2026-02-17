@@ -6,6 +6,7 @@ import { sendTelegramAdminAlert } from './telegram';
 import { sendDiscordAffiliateInvite } from './discord';
 import { buildAffiliateCodeSeed, formatAffiliateCode } from './affiliate-utils';
 import { getSupabase } from './supabase';
+import { getDiscordInviteUrl, hasDiscordInviteBeenSent } from './discordInvites';
 
 export type AffiliateStatus = 'pending' | 'approved' | 'declined' | 'needs_info';
 
@@ -689,6 +690,17 @@ export async function updateAffiliateApplication(input: {
     const updated = (result.rows[0] as AffiliateApplication) || null;
 
     if (updated && desiredStatus === 'approved') {
+      // Auto-create Discord invite for affiliate dashboard
+      try {
+        await getDiscordInviteUrl({
+          flowType: 'affiliate_welcome',
+          userEmail: updated.email,
+        });
+        console.log(`[updateAffiliateApplication] Discord invite created for ${updated.email}`);
+      } catch (error) {
+        console.warn('[updateAffiliateApplication] Discord invite creation failed (will fall back to URL):', error);
+      }
+
       // Send email notification to the affiliate
       await notifyAffiliateApproval(updated).catch((error) => {
         console.error('Affiliate approval email failed', error);
@@ -748,6 +760,17 @@ export async function updateAffiliateApplication(input: {
   await writeJson(STORAGE_FILE, store);
 
   if (nextStatus === 'approved') {
+    // Auto-create Discord invite for affiliate dashboard
+    try {
+      await getDiscordInviteUrl({
+        flowType: 'affiliate_welcome',
+        userEmail: updated.email,
+      });
+      console.log(`[updateAffiliateApplication] Discord invite created for ${updated.email}`);
+    } catch (error) {
+      console.warn('[updateAffiliateApplication] Discord invite creation failed (will fall back to URL):', error);
+    }
+
     // Send email notification to the affiliate
     await notifyAffiliateApproval(updated).catch((error) => {
       console.error('Affiliate approval email failed', error);
@@ -1560,6 +1583,18 @@ export async function sendWelcomeEmail(affiliate: AffiliateApplication): Promise
   const referralUrl = `${siteUrl}/r/${affiliate.code}`;
   const dashboardUrl = `${siteUrl}/account`;
 
+  // Get Discord invite (idempotent; creates once and reuses)
+  let discordInviteUrl = '';
+  try {
+    discordInviteUrl = await getDiscordInviteUrl({
+      flowType: 'affiliate_welcome',
+      userEmail: affiliate.email,
+    });
+  } catch (error) {
+    console.warn('[sendWelcomeEmail] Discord invite creation failed:', error);
+    discordInviteUrl = process.env.DISCORD_FALLBACK_INVITE_URL || 'https://discord.gg/vikinglabs';
+  }
+
   const firstName = affiliate.name.split(' ')[0] || affiliate.name;
 
   const subject = `Welcome to Viking Labs — You're In`;
@@ -1645,6 +1680,24 @@ Viking Labs`;
         <a href="${dashboardUrl}" style="display: inline-block; background: #0f172a; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; letter-spacing: 0.03em;">Open Your Dashboard</a>
       </div>
       
+      <!-- Discord CTA Section -->
+      <div style="background: linear-gradient(135deg, #5865f2 0%, #4752c4 100%); border-radius: 12px; padding: 32px 24px; margin: 32px 0; text-align: center;">
+        <div style="color: #ffffff;">
+          <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.9;">
+            Community
+          </p>
+          <h3 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em;">
+            Join the Viking Labs Discord
+          </h3>
+          <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; opacity: 0.95; color: #ffffff;">
+            Get updates, drops, support, and affiliate tips directly from the team.
+          </p>
+          <a href="${discordInviteUrl}" style="display: inline-block; background: #ffffff; color: #5865f2; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; letter-spacing: 0.02em;">
+            Join Discord
+          </a>
+        </div>
+      </div>
+      
       <p style="font-size: 15px; color: #334155;">We're looking forward to building something long-term, professional, and mutually beneficial. If you ever need clarification, assets, or support, simply reach out — we're here to help you succeed.</p>
       
       <p style="font-size: 15px; color: #334155;">Welcome aboard.</p>
@@ -1684,6 +1737,169 @@ Viking Labs`;
 
   await transporter.sendMail({
     to: affiliate.email,
+    from,
+    subject,
+    text,
+    html,
+  });
+}
+
+/**
+ * Send first-purchase welcome email to new customers
+ */
+export async function sendFirstPurchaseEmail(params: {
+  customerEmail: string;
+  customerName?: string;
+  orderAmount?: number;
+}): Promise<void> {
+  const { customerEmail, customerName = 'Valued Customer', orderAmount } = params;
+
+  if (!customerEmail) {
+    throw new Error('Missing customer email');
+  }
+
+  // Check if we've already sent a Discord invite for this customer (idempotency)
+  const alreadySent = await hasDiscordInviteBeenSent({
+    userEmail: customerEmail,
+    flowType: 'customer_first_purchase',
+  });
+
+  if (alreadySent) {
+    console.log(`[sendFirstPurchaseEmail] Discord invite already sent to ${customerEmail}. Skipping.`);
+    return;
+  }
+
+  const resendKey = process.env.RESEND_API_KEY;
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  if (!resendKey && (!smtpHost || !smtpUser || !smtpPass)) {
+    console.warn('[sendFirstPurchaseEmail] Email credentials not configured. Skipping.');
+    return;
+  }
+
+  const from = process.env.CUSTOMER_EMAIL || process.env.AFFILIATE_EMAIL || 'Viking Labs <info@vikinglabs.co>';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://vikinglabs.co';
+
+  // Get Discord invite (idempotent)
+  let discordInviteUrl = '';
+  try {
+    discordInviteUrl = await getDiscordInviteUrl({
+      flowType: 'customer_first_purchase',
+      userEmail: customerEmail,
+    });
+  } catch (error) {
+    console.warn('[sendFirstPurchaseEmail] Discord invite creation failed:', error);
+    discordInviteUrl = process.env.DISCORD_FALLBACK_INVITE_URL || 'https://discord.gg/vikinglabs';
+  }
+
+  const firstName = customerName.split(' ')[0] || customerName;
+
+  const subject = `Welcome to Viking Labs — Your Order is Confirmed`;
+  const text = `Hi ${firstName},
+
+Thank you for your first order! We're excited to welcome you to the Viking Labs community.
+
+Your order has been confirmed and is being carefully processed. You can expect an update within 24 hours with tracking details.
+
+Viking Labs is committed to providing research-grade peptide products with uncompromising quality and transparency. Every product is thoroughly tested and sourced from trusted suppliers.
+
+Join Our Community:
+Our Discord community connects researchers, enthusiasts, and partners. It's the best place to:
+- Ask questions and get support
+- Connect with other customers
+- Learn about new drops and releases
+- Participate in research discussions
+
+${orderAmount ? `Your Order Total: $${(orderAmount / 100).toFixed(2)}` : ''}
+
+We appreciate your business and look forward to supporting your research.
+
+Best regards,
+Viking Labs Team`;
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 40px 24px; color: #1e293b; line-height: 1.7;">
+      
+      <p style="font-size: 16px;">Hi ${firstName},</p>
+      
+      <p style="font-size: 15px; color: #334155;">Thank you for your first order! We're excited to welcome you to the Viking Labs community.</p>
+      
+      <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px; margin: 24px 0; border-radius: 4px;">
+        <p style="margin: 0; font-size: 15px; font-weight: 600; color: #166534;">✓ Order Confirmed</p>
+        <p style="margin: 8px 0 0 0; font-size: 14px; color: #15803d;">Your order has been confirmed and is being carefully processed. You can expect an update within 24 hours with tracking details.</p>
+      </div>
+      
+      <p style="font-size: 15px; color: #334155;">Viking Labs is committed to providing research-grade peptide products with uncompromising quality and transparency. Every product is thoroughly tested and sourced from trusted suppliers.</p>
+      
+      <!-- Discord CTA Section -->
+      <div style="background: linear-gradient(135deg, #5865f2 0%, #4752c4 100%); border-radius: 12px; padding: 32px 24px; margin: 32px 0; text-align: center;">
+        <div style="color: #ffffff;">
+          <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.9;">
+            Community
+          </p>
+          <h3 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em;">
+            Join the Viking Labs Discord
+          </h3>
+          <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; opacity: 0.95; color: #ffffff;">
+            Ask questions, connect with other customers, and stay updated on new releases.
+          </p>
+          <a href="${discordInviteUrl}" style="display: inline-block; background: #ffffff; color: #5865f2; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; letter-spacing: 0.02em;">
+            Join Discord
+          </a>
+        </div>
+      </div>
+      
+      ${orderAmount ? `
+      <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b;">Order Total</p>
+        <p style="margin: 8px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">$${(orderAmount / 100).toFixed(2)}</p>
+      </div>
+      ` : ''}
+      
+      <p style="font-size: 15px; color: #334155; margin-top: 32px;">We appreciate your business and look forward to supporting your research.</p>
+      
+      <p style="font-size: 15px; color: #1e293b; margin-top: 32px;">
+        <strong>Best regards,</strong><br>
+        <span style="color: #64748b;">Viking Labs Team</span>
+      </p>
+      
+    </div>
+  `;
+
+  // Prefer Resend API, fall back to SMTP/nodemailer
+  if (resendKey) {
+    try {
+      const { Resend } = await import('resend');
+      const resend = new Resend(resendKey);
+      const { error } = await resend.emails.send({
+        from,
+        to: customerEmail,
+        subject,
+        text,
+        html,
+      });
+      if (error) throw new Error(`Resend error: ${error.message}`);
+      return;
+    } catch (error) {
+      console.error('[sendFirstPurchaseEmail] Resend failed:', error);
+      // Fall through to SMTP
+    }
+  }
+
+  // SMTP fallback
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === 'true';
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port,
+    secure,
+    auth: { user: smtpUser, pass: smtpPass },
+  });
+
+  await transporter.sendMail({
+    to: customerEmail,
     from,
     subject,
     text,

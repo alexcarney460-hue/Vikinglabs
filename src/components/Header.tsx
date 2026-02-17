@@ -6,6 +6,8 @@ import { useState } from 'react';
 
 import { useCart } from '../context/CartContext';
 
+const discordUrl = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || 'https://discord.gg/vikinglabs';
+
 const mobileLinks = [
   { href: '/', label: 'Home' },
   { href: '/catalog', label: 'Catalog' },
@@ -13,6 +15,7 @@ const mobileLinks = [
   { href: '/lab-tests', label: 'Lab Reports' },
   { href: '/account', label: 'Account' },
   { href: '/contact', label: 'Support' },
+  { href: discordUrl, label: 'Discord', external: true },
 ];
 
 export default function Header() {
@@ -73,6 +76,18 @@ export default function Header() {
           >
             Support
           </Link>
+          <a
+            href={discordUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-bold uppercase tracking-wide text-slate-700 hover:text-amber-500 transition-colors flex items-center gap-1"
+          >
+            <span>Discord</span>
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M11 3a1 1 0 100 2h2.586L9.293 9.293a1 1 0 001.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+              <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+            </svg>
+          </a>
         </nav>
 
         {/* Icons */}
@@ -134,16 +149,33 @@ export default function Header() {
         <div className="md:hidden border-t border-slate-100 bg-white">
           <nav className="container mx-auto px-6 py-4">
             <div className="grid gap-2">
-              {mobileLinks.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black uppercase tracking-wide text-slate-800 hover:border-slate-300"
-                >
-                  {l.label}
-                </Link>
-              ))}
+              {mobileLinks.map((l) => 
+                l.external ? (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black uppercase tracking-wide text-slate-800 hover:border-slate-300 flex items-center justify-between"
+                  >
+                    <span>{l.label}</span>
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M11 3a1 1 0 100 2h2.586L9.293 9.293a1 1 0 001.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                      <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                    </svg>
+                  </a>
+                ) : (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black uppercase tracking-wide text-slate-800 hover:border-slate-300"
+                  >
+                    {l.label}
+                  </Link>
+                )
+              )}
             </div>
           </nav>
         </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AffiliateSummary, AffiliateConversion, AffiliatePayout, AffiliateApiKey } from '@/lib/affiliates';
 import PartnerAgreement from './PartnerAgreement';
+import DiscordInviteCard from '../DiscordInviteCard';
 
 type ToolkitTemplate = {
   id: string;
@@ -256,6 +257,13 @@ export default function AffiliateDashboard() {
               <p className="mt-3 text-xs text-slate-600">Direct link to the store with your referral tracking.</p>
             </div>
           </div>
+
+          {/* Discord Community Card */}
+          <DiscordInviteCard
+            flowType="affiliate"
+            title="Join Our Community"
+            description="Connect with other affiliates, get exclusive partner updates, and collaborate with the Viking Labs team."
+          />
         </div>
       )}
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
+import DiscordInviteCard from '@/components/DiscordInviteCard';
 
 const AffiliateDashboard = dynamic(() => import('@/components/affiliate/AffiliateDashboard'), {
   ssr: false,
@@ -57,6 +58,7 @@ export default function AccountClient() {
   const [justSaved, setJustSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'research' | 'tools' | 'affiliate'>('profile');
   const [isAffiliate, setIsAffiliate] = useState(false);
+  const [hasOrders, setHasOrders] = useState(false);
 
   useEffect(() => {
     if (!email) return;
@@ -65,18 +67,25 @@ export default function AccountClient() {
   }, [email, profileKey, savedKey]);
 
   useEffect(() => {
-    // Check if user is an approved affiliate
-    const checkAffiliate = async () => {
+    // Check if user is an approved affiliate and if they have orders
+    const checkUserStatus = async () => {
       try {
-        const res = await fetch('/api/affiliate/summary');
-        setIsAffiliate(res.ok);
+        const affiliateRes = await fetch('/api/affiliate/summary');
+        setIsAffiliate(affiliateRes.ok);
       } catch {
         setIsAffiliate(false);
+      }
+
+      try {
+        const discordRes = await fetch('/api/discord/invite?flow=customer');
+        setHasOrders(discordRes.ok);
+      } catch {
+        setHasOrders(false);
       }
     };
 
     if (user) {
-      checkAffiliate();
+      checkUserStatus();
     }
   }, [user]);
 
@@ -194,7 +203,7 @@ export default function AccountClient() {
       </div>
 
       {/* Profile Tab */}
-      {activeTab === 'profile' && <div className="mt-10 grid gap-6 lg:grid-cols-3">
+      {activeTab === 'profile' && <div className="mt-10 grid gap-6 lg:grid-cols-3 relative">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-1">
           <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">Profile</h2>
           <div className="mt-4 space-y-2 text-sm text-slate-700">
@@ -294,6 +303,17 @@ export default function AccountClient() {
             </ul>
           </div>
         </div>
+
+        {/* Discord Community Card (if user has orders) */}
+        {hasOrders && (
+          <div className="lg:col-span-3">
+            <DiscordInviteCard
+              flowType="customer"
+              title="Join Our Community"
+              description="Connect with other researchers, get product updates, and participate in discussions with the Viking Labs community."
+            />
+          </div>
+        )}
       </div>
       }
 
