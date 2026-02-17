@@ -4,6 +4,7 @@ import FacebookProvider from 'next-auth/providers/facebook';
 import AppleProvider from 'next-auth/providers/apple';
 
 import TikTokProvider from './tiktok-provider';
+import { EmailCredentialsProvider } from './credentials-provider';
 
 function getAdminEmail(): string | null {
   const raw = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
@@ -28,7 +29,10 @@ export const authOptions: NextAuthOptions = {
     verifyRequest: '/account/login?checkEmail=1',
   },
   providers: [
-    // Only enable a provider when its credentials exist.
+    // Email + password authentication (always available)
+    EmailCredentialsProvider,
+
+    // OAuth providers (only enable when credentials exist)
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ? [GoogleProvider({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET })]
       : []),
@@ -44,8 +48,6 @@ export const authOptions: NextAuthOptions = {
     ...(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET
       ? [TikTokProvider({ clientId: process.env.TIKTOK_CLIENT_KEY, clientSecret: process.env.TIKTOK_CLIENT_SECRET })]
       : []),
-
-    // Email sign-in disabled (OAuth-only)
   ],
   callbacks: {
     async jwt({ token, user }) {
