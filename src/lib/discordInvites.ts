@@ -149,13 +149,16 @@ export async function getDiscordInviteUrl(params: {
       if (!queryError && existing) {
         console.log(`[getDiscordInviteUrl] Reusing existing invite for ${normalizedEmail} (${flowType})`);
         // Mark as sent if not already
-        await supabase
-          .from('discord_invite_records')
-          .update({ sent_at: new Date().toISOString() })
-          .eq('user_email', normalizedEmail)
-          .eq('flow_type', flowType)
-          .is('sent_at', null)
-          .catch(() => {}); // Ignore errors
+        try {
+          await supabase
+            .from('discord_invite_records')
+            .update({ sent_at: new Date().toISOString() })
+            .eq('user_email', normalizedEmail)
+            .eq('flow_type', flowType)
+            .is('sent_at', null);
+        } catch (error) {
+          // Ignore errors
+        }
         return `https://discord.gg/${existing.discord_invite_code}`;
       }
 
