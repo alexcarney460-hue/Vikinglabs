@@ -1,6 +1,69 @@
 {
   "views": [
     {
+      "id": "2b34c8c4-123b-423c-8816-199dd9e02025",
+      "path": "/affiliates",
+      "referrer": "http://localhost:3000/affiliates",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:42:46.657Z"
+    },
+    {
+      "id": "fd1cfccf-c367-4ca9-87e1-cea353746abb",
+      "path": "/affiliates",
+      "referrer": "http://localhost:3000/affiliates",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:40:31.374Z"
+    },
+    {
+      "id": "87b3798f-9213-4da9-896b-1c75ba2ec88c",
+      "path": "/affiliates",
+      "referrer": "http://localhost:3000/affiliates",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:39:19.328Z"
+    },
+    {
+      "id": "94402f0c-dc55-4907-85ea-cef70b900d64",
+      "path": "/affiliates",
+      "referrer": "http://localhost:3000/affiliates",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:39:18.673Z"
+    },
+    {
+      "id": "27cf059c-4316-4d0d-a238-4dc0c0e76abb",
+      "path": "/affiliates/apply",
+      "referrer": "http://localhost:3000/affiliates/apply",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:36:45.609Z"
+    },
+    {
+      "id": "27defc60-acf5-4287-b1b4-d7dbbb452bfc",
+      "path": "/creators",
+      "referrer": "http://localhost:3000/creators",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:36:26.752Z"
+    },
+    {
+      "id": "40e39e83-4219-4920-9194-16a343fb8119",
+      "path": "/affiliates/apply",
+      "referrer": "http://localhost:3000/affiliates/apply",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:35:31.944Z"
+    },
+    {
+      "id": "47f7c0d5-e6cc-48a9-9812-8a2860616a43",
+      "path": "/affiliates",
+      "referrer": "http://localhost:3000/affiliates",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:35:23.521Z"
+    },
+    {
+      "id": "8ce37fb3-4f56-45c4-907c-483ecc9d755c",
+      "path": "/affiliates/apply",
+      "referrer": "http://localhost:3000/affiliates/apply",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0",
+      "createdAt": "2026-02-17T04:34:25.678Z"
+    },
+    {
       "id": "dc52d93e-1682-4b91-a046-567aa7039aaa",
       "path": "/",
       "referrer": "http://localhost:3000/",
