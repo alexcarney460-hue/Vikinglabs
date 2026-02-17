@@ -78,12 +78,9 @@ function LoginInner() {
             <LoginForm type="login" />
             <div className="text-center text-sm text-slate-600">
               Don't have an account?{' '}
-              <button
-                onClick={() => setTab('signup')}
-                className="font-semibold text-amber-600 hover:underline"
-              >
+              <Link href="/account/verify-email?new=1" className="font-semibold text-amber-600 hover:underline">
                 Sign up
-              </button>
+              </Link>
             </div>
           </div>
         )}
