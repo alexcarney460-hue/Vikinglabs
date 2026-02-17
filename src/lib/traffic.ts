@@ -1,4 +1,5 @@
 import { getSql, hasPooledDatabase } from '@/lib/db';
+import { getSupabase } from '@/lib/supabase';
 import { readJson, writeJson } from '@/lib/storage';
 
 export type PageViewRecord = {
@@ -40,27 +41,43 @@ export async function recordPageView(input: {
 }): Promise<void> {
   if (!input.path) return;
 
-  if (hasDatabase()) {
-    const sql = await getSql();
-    if (sql) {
-      await ensureTrafficTable();
-      await sql`
-        INSERT INTO page_views (id, path, referrer, user_agent, created_at)
-        VALUES (${input.id}, ${input.path}, ${input.referrer ?? null}, ${input.userAgent ?? null}, ${input.createdAt})
-      `;
+  try {
+    // Try @vercel/postgres first
+    let sql = await getSql();
+    
+    // Fall back to Supabase
+    if (!sql) {
+      const supabase = getSupabase();
+      if (!supabase) {
+        console.error('[Traffic] No database available; page view lost:', input.path);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('page_views')
+        .insert({
+          id: input.id,
+          path: input.path,
+          referrer: input.referrer ?? null,
+          user_agent: input.userAgent ?? null,
+          created_at: input.createdAt,
+        });
+
+      if (error) {
+        console.error('[Traffic] Supabase insert failed:', error);
+      }
       return;
     }
-  }
 
-  const store = await readJson<PageViewStore>(STORAGE_FILE, EMPTY_STORE);
-  store.views.unshift({
-    id: input.id,
-    path: input.path,
-    referrer: input.referrer ?? null,
-    userAgent: input.userAgent ?? null,
-    createdAt: input.createdAt,
-  });
-  await writeJson(STORAGE_FILE, store);
+    // Use @vercel/postgres
+    await ensureTrafficTable();
+    await sql`
+      INSERT INTO page_views (id, path, referrer, user_agent, created_at)
+      VALUES (${input.id}, ${input.path}, ${input.referrer ?? null}, ${input.userAgent ?? null}, ${input.createdAt})
+    `;
+  } catch (error) {
+    console.error('[Traffic] Failed to record page view:', error);
+  }
 }
 
 export async function getTrafficSummary(): Promise<{ day: number; week: number; month: number }> {
@@ -69,8 +86,10 @@ export async function getTrafficSummary(): Promise<{ day: number; week: number; 
   const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  if (hasDatabase()) {
-    const sql = await getSql();
+  try {
+    // Try @vercel/postgres first
+    let sql = await getSql();
+    
     if (sql) {
       await ensureTrafficTable();
       const day = await sql`SELECT COUNT(*)::int AS count FROM page_views WHERE created_at >= ${dayAgo}`;
@@ -82,15 +101,43 @@ export async function getTrafficSummary(): Promise<{ day: number; week: number; 
         month: (month.rows[0] as any)?.count ?? 0,
       };
     }
-  }
 
-  const store = await readJson<PageViewStore>(STORAGE_FILE, EMPTY_STORE);
-  const views = store.views;
-  return {
-    day: views.filter((v) => v.createdAt >= dayAgo).length,
-    week: views.filter((v) => v.createdAt >= weekAgo).length,
-    month: views.filter((v) => v.createdAt >= monthAgo).length,
-  };
+    // Fall back to Supabase
+    const supabase = getSupabase();
+    if (!supabase) {
+      console.error('[Traffic] Database not available; returning 0 counts');
+      return { day: 0, week: 0, month: 0 };
+    }
+
+    const { data: dayData, error: dayErr } = await supabase
+      .from('page_views')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', dayAgo);
+
+    const { data: weekData, error: weekErr } = await supabase
+      .from('page_views')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', weekAgo);
+
+    const { data: monthData, error: monthErr } = await supabase
+      .from('page_views')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', monthAgo);
+
+    if (dayErr || weekErr || monthErr) {
+      console.error('[Traffic] Supabase query failed');
+      return { day: 0, week: 0, month: 0 };
+    }
+
+    return {
+      day: dayData?.length ?? 0,
+      week: weekData?.length ?? 0,
+      month: monthData?.length ?? 0,
+    };
+  } catch (error) {
+    console.error('[Traffic] Failed to fetch summary:', error);
+    return { day: 0, week: 0, month: 0 };
+  }
 }
 
 export async function getDailyTraffic(days = 30): Promise<Array<{ date: string; count: number }>> {
@@ -107,8 +154,10 @@ export async function getDailyTraffic(days = 30): Promise<Array<{ date: string; 
     buckets.set(key, 0);
   }
 
-  if (hasDatabase()) {
-    const sql = await getSql();
+  try {
+    // Try @vercel/postgres first
+    let sql = await getSql();
+    
     if (sql) {
       await ensureTrafficTable();
       const rows = await sql`
@@ -122,14 +171,36 @@ export async function getDailyTraffic(days = 30): Promise<Array<{ date: string; 
         const key = new Date(row.day).toISOString().slice(0, 10);
         buckets.set(key, row.count);
       }
+      return Array.from(buckets.entries()).map(([date, count]) => ({ date, count }));
     }
-  } else {
-    const store = await readJson<PageViewStore>(STORAGE_FILE, EMPTY_STORE);
-    for (const view of store.views) {
-      if (view.createdAt < start.toISOString()) continue;
-      const key = new Date(view.createdAt).toISOString().slice(0, 10);
-      if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
+
+    // Fall back to Supabase
+    const supabase = getSupabase();
+    if (!supabase) {
+      console.error('[Traffic] Database not available; returning empty daily traffic');
+      return Array.from(buckets.entries()).map(([date, count]) => ({ date, count }));
     }
+
+    const { data, error } = await supabase
+      .from('page_views')
+      .select('created_at')
+      .gte('created_at', start.toISOString())
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('[Traffic] Supabase query failed:', error);
+      return Array.from(buckets.entries()).map(([date, count]) => ({ date, count }));
+    }
+
+    // Group by date
+    for (const row of data || []) {
+      const key = new Date(row.created_at).toISOString().slice(0, 10);
+      if (buckets.has(key)) {
+        buckets.set(key, (buckets.get(key) ?? 0) + 1);
+      }
+    }
+  } catch (error) {
+    console.error('[Traffic] Failed to fetch daily traffic:', error);
   }
 
   return Array.from(buckets.entries()).map(([date, count]) => ({ date, count }));
