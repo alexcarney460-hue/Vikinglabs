@@ -8,8 +8,14 @@ export default function PageViewTracker() {
 
   useEffect(() => {
     const path = pathname;
+    const url = `/api/traffic/pixel?path=${encodeURIComponent(path)}&ts=${Date.now()}`;
+    
+    console.log('[PageViewTracker] Tracking page view:', path);
+    
     const img = new Image();
-    img.src = `/api/traffic/pixel?path=${encodeURIComponent(path)}&ts=${Date.now()}`;
+    img.onload = () => console.log('[PageViewTracker] Pixel loaded');
+    img.onerror = () => console.error('[PageViewTracker] Pixel failed to load');
+    img.src = url;
   }, [pathname]);
 
   return null;

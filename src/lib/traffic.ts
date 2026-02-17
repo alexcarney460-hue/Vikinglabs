@@ -109,30 +109,32 @@ export async function getTrafficSummary(): Promise<{ day: number; week: number; 
       return { day: 0, week: 0, month: 0 };
     }
 
-    const { data: dayData, error: dayErr } = await supabase
+    const { count: dayCount, error: dayErr } = await supabase
       .from('page_views')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', dayAgo);
 
-    const { data: weekData, error: weekErr } = await supabase
+    const { count: weekCount, error: weekErr } = await supabase
       .from('page_views')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', weekAgo);
 
-    const { data: monthData, error: monthErr } = await supabase
+    const { count: monthCount, error: monthErr } = await supabase
       .from('page_views')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', monthAgo);
 
     if (dayErr || weekErr || monthErr) {
-      console.error('[Traffic] Supabase query failed');
+      console.error('[Traffic] Supabase query failed:', { dayErr, weekErr, monthErr });
       return { day: 0, week: 0, month: 0 };
     }
 
+    console.log('[Traffic] Counts fetched:', { dayCount, weekCount, monthCount });
+
     return {
-      day: dayData?.length ?? 0,
-      week: weekData?.length ?? 0,
-      month: monthData?.length ?? 0,
+      day: dayCount ?? 0,
+      week: weekCount ?? 0,
+      month: monthCount ?? 0,
     };
   } catch (error) {
     console.error('[Traffic] Failed to fetch summary:', error);
