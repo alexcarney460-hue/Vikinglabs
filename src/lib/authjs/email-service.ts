@@ -3,13 +3,14 @@
  * Handles verification codes, password resets, and email user management
  */
 
+import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@supabase/supabase-js';
-import { sendVerificationEmail, sendPasswordResetEmail } from '@/lib/email';
+import { sendVerificationEmail, sendPasswordResetEmail as sendResetEmailTemplate } from '@/lib/email';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+const getSupabase = () => createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 /**
@@ -23,7 +24,7 @@ export function generateVerificationCode(): string {
  * Generate a random reset token
  */
 export function generateResetToken(): string {
-  return require('crypto').randomBytes(32).toString('hex');
+  return randomBytes(32).toString('hex');
 }
 
 /**
@@ -32,6 +33,8 @@ export function generateResetToken(): string {
  */
 export async function sendVerificationCode(email: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const supabase = getSupabase();
+    
     // Clean up old codes for this email
     await supabase
       .from('email_verification_tokens')
@@ -78,6 +81,8 @@ export async function verifyEmailCode(
   displayName?: string
 ): Promise<{ success: boolean; userId?: string; error?: string }> {
   try {
+    const supabase = getSupabase();
+    
     // Find valid code
     const { data: tokenData, error: tokenError } = await supabase
       .from('email_verification_tokens')
@@ -165,6 +170,8 @@ export async function createEmailUser(
   displayName?: string
 ): Promise<{ success: boolean; userId?: string; error?: string }> {
   try {
+    const supabase = getSupabase();
+    
     // Check if user exists
     const { data: existing } = await supabase
       .from('users')
@@ -214,6 +221,8 @@ export async function authenticateEmailUser(
   password: string
 ): Promise<{ success: boolean; user?: any; error?: string }> {
   try {
+    const supabase = getSupabase();
+    
     // Find user
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -246,6 +255,8 @@ export async function authenticateEmailUser(
  */
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const supabase = getSupabase();
+    
     // Check if user exists
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -277,7 +288,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
 
     // Send email
     const resetUrl = `${process.env.NEXTAUTH_URL}/account/reset-password?token=${token}`;
-    await sendPasswordResetEmail(email, resetUrl);
+    await sendResetEmailTemplate(email, resetUrl);
 
     return { success: true };
   } catch (error) {
@@ -297,6 +308,8 @@ export async function resetPassword(
   newPassword: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const supabase = getSupabase();
+    
     // Find valid token
     const { data: resetToken, error: tokenError } = await supabase
       .from('password_reset_tokens')
