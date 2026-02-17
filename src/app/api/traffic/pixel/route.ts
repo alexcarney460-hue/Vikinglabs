@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
     const ref = req.headers.get('referer');
     const userAgent = req.headers.get('user-agent');
 
+    console.log('[Pixel] Request received:', { path, referer: ref, userAgent: userAgent?.slice(0, 50) });
+
     if (path) {
+      console.log('[Pixel] Recording page view for path:', path);
       await recordPageView({
         id: crypto.randomUUID(),
         path: path.slice(0, 512),
@@ -17,6 +20,9 @@ export async function GET(req: NextRequest) {
         userAgent,
         createdAt: new Date().toISOString(),
       });
+      console.log('[Pixel] Page view recorded successfully');
+    } else {
+      console.warn('[Pixel] No path provided');
     }
 
     return new NextResponse(null, {
@@ -26,7 +32,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Traffic pixel failed', error);
+    console.error('[Pixel] Traffic pixel failed', error);
     return new NextResponse(null, { status: 204 });
   }
 }

@@ -6,8 +6,8 @@ export type PageViewRecord = {
   id: string;
   path: string;
   referrer?: string | null;
-  userAgent?: string | null;
-  createdAt: string;
+  visitor_id?: string | null;
+  created_at: string;
 };
 
 type PageViewStore = { views: PageViewRecord[] };
@@ -59,7 +59,7 @@ export async function recordPageView(input: {
           id: input.id,
           path: input.path,
           referrer: input.referrer ?? null,
-          user_agent: input.userAgent ?? null,
+          visitor_id: input.userAgent ?? null,
           created_at: input.createdAt,
         });
 
@@ -72,7 +72,7 @@ export async function recordPageView(input: {
     // Use @vercel/postgres
     await ensureTrafficTable();
     await sql`
-      INSERT INTO page_views (id, path, referrer, user_agent, created_at)
+      INSERT INTO page_views (id, path, referrer, visitor_id, created_at)
       VALUES (${input.id}, ${input.path}, ${input.referrer ?? null}, ${input.userAgent ?? null}, ${input.createdAt})
     `;
   } catch (error) {
