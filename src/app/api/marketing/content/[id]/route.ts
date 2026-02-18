@@ -105,6 +105,10 @@ export async function PATCH(
         if (typeof value !== 'string') {
           return respondBadRequest('posted_at must be an ISO timestamp string or null');
         }
+        const timestamp = Date.parse(value);
+        if (isNaN(timestamp)) {
+          return respondBadRequest('posted_at must be a valid ISO timestamp');
+        }
       }
       update.posted_at = value;
     }

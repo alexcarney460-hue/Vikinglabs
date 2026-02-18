@@ -8,7 +8,7 @@ ADD COLUMN likes INTEGER,
 ADD COLUMN comments INTEGER,
 ADD COLUMN shares INTEGER,
 ADD COLUMN saves INTEGER,
-ADD COLUMN engagement_rate FLOAT,
+ADD COLUMN engagement_rate NUMERIC(6,5),
 ADD COLUMN posted_at TIMESTAMPTZ,
 ADD COLUMN platform_post_id TEXT;
 
