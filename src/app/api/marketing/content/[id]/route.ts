@@ -16,6 +16,14 @@ interface UpdatePayload {
     flags?: string[];
     notes?: string;
   };
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  saves?: number | null;
+  engagement_rate?: number | null;
+  posted_at?: string | null;
+  platform_post_id?: string | null;
 }
 
 export async function PATCH(
@@ -72,6 +80,43 @@ export async function PATCH(
           update.compliance = complianceUpdate;
         }
       }
+    }
+
+    // Metrics fields validation
+    const metricFields = ['views', 'likes', 'comments', 'shares', 'saves', 'engagement_rate'] as const;
+    for (const field of metricFields) {
+      if (field in body) {
+        const value = body[field as keyof typeof body];
+        if (value !== null && value !== undefined) {
+          if (typeof value !== 'number') {
+            return respondBadRequest(`${field} must be a number or null`);
+          }
+          if (value < 0) {
+            return respondBadRequest(`${field} cannot be negative`);
+          }
+        }
+        update[field] = value;
+      }
+    }
+
+    if ('posted_at' in body) {
+      const value = body.posted_at;
+      if (value !== null && value !== undefined) {
+        if (typeof value !== 'string') {
+          return respondBadRequest('posted_at must be an ISO timestamp string or null');
+        }
+      }
+      update.posted_at = value;
+    }
+
+    if ('platform_post_id' in body) {
+      const value = body.platform_post_id;
+      if (value !== null && value !== undefined) {
+        if (typeof value !== 'string') {
+          return respondBadRequest('platform_post_id must be a string or null');
+        }
+      }
+      update.platform_post_id = value;
     }
 
     if (Object.keys(update).length === 0) {

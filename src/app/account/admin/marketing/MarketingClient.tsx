@@ -18,6 +18,14 @@ interface ContentItem {
   compliance: ComplianceData;
   status: string;
   created_at: string;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  saves?: number | null;
+  engagement_rate?: number | null;
+  posted_at?: string | null;
+  platform_post_id?: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -198,6 +206,48 @@ export function MarketingClient() {
                     <p className="mt-2 text-xs text-slate-600">{item.compliance.notes}</p>
                   )}
                 </div>
+
+                {(item.views !== null ||
+                  item.likes !== null ||
+                  item.shares !== null ||
+                  item.saves !== null ||
+                  item.engagement_rate !== null) && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-600">METRICS</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      {item.views !== null && (
+                        <div className="rounded bg-slate-50 px-2 py-1">
+                          <span className="text-xs text-slate-600">Views:</span>{' '}
+                          <span className="font-semibold text-slate-900">{item.views.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {item.likes !== null && (
+                        <div className="rounded bg-slate-50 px-2 py-1">
+                          <span className="text-xs text-slate-600">Likes:</span>{' '}
+                          <span className="font-semibold text-slate-900">{item.likes.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {item.shares !== null && (
+                        <div className="rounded bg-slate-50 px-2 py-1">
+                          <span className="text-xs text-slate-600">Shares:</span>{' '}
+                          <span className="font-semibold text-slate-900">{item.shares.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {item.saves !== null && (
+                        <div className="rounded bg-slate-50 px-2 py-1">
+                          <span className="text-xs text-slate-600">Saves:</span>{' '}
+                          <span className="font-semibold text-slate-900">{item.saves.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {item.engagement_rate !== null && (
+                        <div className="rounded bg-slate-50 px-2 py-1">
+                          <span className="text-xs text-slate-600">Engagement:</span>{' '}
+                          <span className="font-semibold text-slate-900">{(item.engagement_rate * 100).toFixed(2)}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
