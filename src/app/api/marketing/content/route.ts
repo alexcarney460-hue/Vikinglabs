@@ -24,28 +24,59 @@ interface ContentPayload {
 }
 
 function validateContentPayload(body: unknown): body is ContentPayload {
-  if (!body || typeof body !== 'object') return false;
+  if (!body || typeof body !== 'object') {
+    return false;
+  }
 
   const obj = body as Record<string, unknown>;
 
-  return (
-    typeof obj.platform === 'string' &&
-    VALID_PLATFORMS.includes(obj.platform) &&
-    typeof obj.format === 'string' &&
-    typeof obj.topic === 'string' &&
-    typeof obj.hook === 'string' &&
-    Array.isArray(obj.script) &&
-    obj.script.every((s: unknown) => typeof s === 'string') &&
-    typeof obj.caption === 'string' &&
-    Array.isArray(obj.hashtags) &&
-    obj.hashtags.every((h: unknown) => typeof h === 'string') &&
-    typeof obj.cta === 'string' &&
-    obj.compliance &&
-    typeof obj.compliance === 'object' &&
-    typeof (obj.compliance as Record<string, unknown>).risk_score === 'number' &&
-    Array.isArray((obj.compliance as Record<string, unknown>).flags) &&
-    typeof (obj.compliance as Record<string, unknown>).notes === 'string'
-  );
+  if (
+    typeof obj.platform !== 'string' ||
+    !VALID_PLATFORMS.includes(obj.platform as string)
+  ) {
+    return false;
+  }
+
+  if (typeof obj.format !== 'string' || typeof obj.topic !== 'string') {
+    return false;
+  }
+
+  if (typeof obj.hook !== 'string' || typeof obj.caption !== 'string') {
+    return false;
+  }
+
+  if (
+    !Array.isArray(obj.script) ||
+    !obj.script.every((s: unknown) => typeof s === 'string')
+  ) {
+    return false;
+  }
+
+  if (
+    !Array.isArray(obj.hashtags) ||
+    !obj.hashtags.every((h: unknown) => typeof h === 'string')
+  ) {
+    return false;
+  }
+
+  if (typeof obj.cta !== 'string') {
+    return false;
+  }
+
+  if (!obj.compliance || typeof obj.compliance !== 'object') {
+    return false;
+  }
+
+  const comp = obj.compliance as Record<string, unknown>;
+  if (
+    typeof comp.risk_score !== 'number' ||
+    !Array.isArray(comp.flags) ||
+    typeof comp.notes !== 'string'
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export async function GET(req: NextRequest) {
