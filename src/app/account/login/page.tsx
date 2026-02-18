@@ -70,8 +70,6 @@ function LoginInner() {
         <div className="space-y-3">
           <p className="text-xs text-slate-500">Sign in with a social account:</p>
           <ProviderButton id="google" label="Google" />
-          <ProviderButton id="apple" label="Apple" />
-          <ProviderButton id="facebook" label="Facebook" />
           <ProviderButton id="tiktok" label="TikTok" />
         </div>
 

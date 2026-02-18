@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import FacebookProvider from 'next-auth/providers/facebook';
-import AppleProvider from 'next-auth/providers/apple';
+// import FacebookProvider from 'next-auth/providers/facebook';
+// import AppleProvider from 'next-auth/providers/apple';
 
 import TikTokProvider from './tiktok-provider';
 import { EmailCredentialsProvider } from './credentials-provider';
@@ -37,13 +37,13 @@ export const authOptions: NextAuthOptions = {
       ? [GoogleProvider({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET })]
       : []),
 
-    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET
-      ? [AppleProvider({ clientId: process.env.APPLE_CLIENT_ID, clientSecret: process.env.APPLE_CLIENT_SECRET })]
-      : []),
+    // ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET
+    //   ? [AppleProvider({ clientId: process.env.APPLE_CLIENT_ID, clientSecret: process.env.APPLE_CLIENT_SECRET })]
+    //   : []),
 
-    ...(process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET
-      ? [FacebookProvider({ clientId: process.env.FACEBOOK_CLIENT_ID, clientSecret: process.env.FACEBOOK_CLIENT_SECRET })]
-      : []),
+    // ...(process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET
+    //   ? [FacebookProvider({ clientId: process.env.FACEBOOK_CLIENT_ID, clientSecret: process.env.FACEBOOK_CLIENT_SECRET })]
+    //   : []),
 
     ...(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET
       ? [TikTokProvider({ clientId: process.env.TIKTOK_CLIENT_KEY, clientSecret: process.env.TIKTOK_CLIENT_SECRET })]
