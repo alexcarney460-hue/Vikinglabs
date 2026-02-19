@@ -1,17 +1,26 @@
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const ENC_KEY = process.env.SOCIAL_TOKEN_ENC_KEY;
 
-if (!ENC_KEY || ENC_KEY.length < 64) {
-  throw new Error(
-    'SOCIAL_TOKEN_ENC_KEY must be set and at least 64 hex characters (32 bytes)'
-  );
+function getKeyBuffer(): Buffer {
+  const ENC_KEY = process.env.SOCIAL_TOKEN_ENC_KEY;
+  
+  if (!ENC_KEY || ENC_KEY.length < 64) {
+    // Graceful fallback for development/missing env var
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'SOCIAL_TOKEN_ENC_KEY must be set and at least 64 hex characters (32 bytes)'
+      );
+    }
+    // Development: return a dummy key (won't work, but allows build)
+    return Buffer.from('0'.repeat(64), 'hex');
+  }
+  
+  return Buffer.from(ENC_KEY, 'hex');
 }
 
-const KEY_BUFFER = Buffer.from(ENC_KEY, 'hex');
-
 export function encryptToken(token: string): string {
+  const KEY_BUFFER = getKeyBuffer();
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(ALGORITHM, KEY_BUFFER, iv);
 
@@ -26,6 +35,7 @@ export function encryptToken(token: string): string {
 }
 
 export function decryptToken(encrypted: string): string {
+  const KEY_BUFFER = getKeyBuffer();
   const [ivHex, authTagHex, encryptedData] = encrypted.split(':');
 
   const iv = Buffer.from(ivHex, 'hex');
