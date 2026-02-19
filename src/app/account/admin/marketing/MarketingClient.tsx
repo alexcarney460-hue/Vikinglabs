@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { VideoUploadForm } from './VideoUploadForm';
 
 interface ComplianceData {
   risk_score: number;
@@ -46,6 +47,7 @@ export function MarketingClient() {
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [error, setError] = useState('');
+  const [selectedForUpload, setSelectedForUpload] = useState<string | null>(null);
 
   useEffect(() => {
     loadContent();
@@ -263,13 +265,12 @@ export function MarketingClient() {
                   </button>
                 )}
 
-                {status !== 'posted' && (
+                {(status === 'approved' || status === 'draft') && (
                   <button
-                    onClick={() => updateStatus(item.id, 'posted')}
-                    disabled={updating[item.id]}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    onClick={() => setSelectedForUpload(item.id)}
+                    className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
                   >
-                    Mark Posted
+                    Upload & Post Video
                   </button>
                 )}
 
@@ -283,6 +284,20 @@ export function MarketingClient() {
                   </button>
                 )}
               </div>
+
+              {/* Video Upload Form */}
+              {selectedForUpload === item.id && (
+                <div className="mt-4">
+                  <VideoUploadForm
+                    contentId={item.id}
+                    onSuccess={() => {
+                      setSelectedForUpload(null);
+                      loadContent();
+                    }}
+                    onError={(err) => setError(err)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
