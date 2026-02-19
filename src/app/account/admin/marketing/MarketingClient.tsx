@@ -55,7 +55,7 @@ export function MarketingClient() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/marketing/content?status=${status}`);
+      const res = await fetch(`/api/admin/marketing/content?status=${status}`);
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Failed to load content');
@@ -72,7 +72,7 @@ export function MarketingClient() {
   async function updateStatus(id: string, newStatus: string) {
     setUpdating((prev) => ({ ...prev, [id]: true }));
     try {
-      const res = await fetch(`/api/marketing/content/${id}`, {
+      const res = await fetch(`/api/admin/marketing/content?id=${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
