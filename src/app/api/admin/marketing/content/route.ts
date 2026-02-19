@@ -1,39 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authjs/options';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
 
-// Helper: Check if user is admin by checking auth metadata
-async function isUserAdmin(userId: string): Promise<boolean> {
-  try {
-    const supabase = getSupabaseServer();
-    
-    // Get user from auth.users and check raw_user_meta_data
-    const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
-    
-    if (error || !user) return false;
-    
-    // Check if role is set in user metadata
-    return (user.user_metadata as any)?.role === 'admin';
-  } catch (err) {
-    return false;
-  }
-}
-
 // GET /api/admin/marketing/content — Fetch marketing content (admin only)
 export async function GET(req: NextRequest) {
   try {
-    const user = await getSessionUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 401 }
-      );
-    }
-
-    const isAdmin = await isUserAdmin(user.id);
-    if (!isAdmin) {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { role?: string; email?: string } | undefined;
+    
+    if (!user || user.role !== 'admin') {
       return NextResponse.json(
         { error: 'Unauthorized: Admin access required' },
         { status: 401 }
@@ -76,16 +54,10 @@ export async function GET(req: NextRequest) {
 // PATCH /api/admin/marketing/content?id=xxx — Update content status
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await getSessionUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 401 }
-      );
-    }
-
-    const isAdmin = await isUserAdmin(user.id);
-    if (!isAdmin) {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { role?: string; email?: string } | undefined;
+    
+    if (!user || user.role !== 'admin') {
       return NextResponse.json(
         { error: 'Unauthorized: Admin access required' },
         { status: 401 }
@@ -136,16 +108,10 @@ export async function PATCH(req: NextRequest) {
 // DELETE /api/admin/marketing/content?id=xxx — Delete content
 export async function DELETE(req: NextRequest) {
   try {
-    const user = await getSessionUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 401 }
-      );
-    }
-
-    const isAdmin = await isUserAdmin(user.id);
-    if (!isAdmin) {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { role?: string; email?: string } | undefined;
+    
+    if (!user || user.role !== 'admin') {
       return NextResponse.json(
         { error: 'Unauthorized: Admin access required' },
         { status: 401 }
