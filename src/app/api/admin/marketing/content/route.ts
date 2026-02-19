@@ -4,13 +4,33 @@ import { getSupabaseServer } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
 
+// Helper: Check if user is admin
+async function isUserAdmin(user: any): Promise<boolean> {
+  // Check session role first (fastest)
+  if (user?.role === 'admin') {
+    return true;
+  }
+  
+  // If not in session, user needs to log out and log back in
+  // to refresh their session with updated role
+  return false;
+}
+
 // GET /api/admin/marketing/content — Fetch marketing content (admin only)
 export async function GET(req: NextRequest) {
   try {
     const user = await getSessionUser();
-    if (!user || user.role !== 'admin') {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized: Admin access required' },
+        { status: 401 }
+      );
+    }
+
+    const isAdmin = await isUserAdmin(user);
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required. Please log out and log back in to refresh your session.' },
         { status: 401 }
       );
     }
@@ -52,9 +72,17 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getSessionUser();
-    if (!user || user.role !== 'admin') {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized: Admin access required' },
+        { status: 401 }
+      );
+    }
+
+    const isAdmin = await isUserAdmin(user);
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required. Please log out and log back in to refresh your session.' },
         { status: 401 }
       );
     }
@@ -104,9 +132,17 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const user = await getSessionUser();
-    if (!user || user.role !== 'admin') {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized: Admin access required' },
+        { status: 401 }
+      );
+    }
+
+    const isAdmin = await isUserAdmin(user);
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required. Please log out and log back in to refresh your session.' },
         { status: 401 }
       );
     }
