@@ -68,15 +68,30 @@ export async function POST(req: NextRequest) {
 }
 
 async function fetchInstagramMetrics(postId: string): Promise<any> {
-  // Placeholder: Real implementation requires Instagram Graph API token
-  // This would fetch insights like impressions, reach, engagement
-  return {
-    views: Math.floor(Math.random() * 10000),
-    likes: Math.floor(Math.random() * 500),
-    comments: Math.floor(Math.random() * 50),
-    shares: Math.floor(Math.random() * 30),
-    saves: Math.floor(Math.random() * 100),
-  };
+  try {
+    // Use real Instagram scraper from Phase 2
+    const { scrapeInstagramPostMetrics } = await import('@/lib/instagram-metrics');
+    const postUrl = `https://www.instagram.com/p/${postId}/`;
+    const metrics = await scrapeInstagramPostMetrics(postUrl);
+    
+    return {
+      views: metrics.views || 0,
+      likes: metrics.likes || 0,
+      comments: metrics.comments || 0,
+      shares: 0, // Not available via public scraping
+      saves: metrics.saves || 0,
+    };
+  } catch (error) {
+    console.error(`[metrics/sync] Failed to scrape Instagram metrics for ${postId}:`, error);
+    // Return zeros on failure instead of fake data
+    return {
+      views: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      saves: 0,
+    };
+  }
 }
 
 async function fetchTikTokMetrics(postId: string): Promise<any> {
