@@ -83,12 +83,43 @@ export function MarketingClient() {
         const data = await res.json();
         throw new Error(data.error || 'Failed to update');
       }
+
+      // If approving, auto-generate video + post
+      if (newStatus === 'approved') {
+        await generateAndPostVideo(id);
+      }
+
       // Reload content
       await loadContent();
     } catch (err) {
       setError((err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setUpdating((prev) => ({ ...prev, [id]: false }));
+    }
+  }
+
+  async function generateAndPostVideo(id: string) {
+    try {
+      const genRes = await fetch(`/api/admin/marketing/content/generate-and-post`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentId: id,
+          template: 'bold_minimal_v1',
+          primaryColor: '#000000',
+          accentColor: '#FFFFFF',
+        }),
+      });
+
+      if (!genRes.ok) {
+        const genData = await genRes.json();
+        throw new Error(`${genData.error} (${genData.stage})`);
+      }
+
+      const genResult = await genRes.json();
+      setError(`✅ Video generated and posted! URL: ${genResult.postUrl}`);
+    } catch (err) {
+      setError(`Auto-generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }
 
