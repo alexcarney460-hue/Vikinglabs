@@ -4,16 +4,20 @@ import { getSupabaseServer } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
 
-// Helper: Check if user is admin
-async function isUserAdmin(user: any): Promise<boolean> {
-  // Check session role first (fastest)
-  if (user?.role === 'admin') {
-    return true;
+// Helper: Check if user is admin by querying the users table
+async function isUserAdmin(userId: string): Promise<boolean> {
+  try {
+    const supabase = getSupabaseServer();
+    const { data } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
+    
+    return data?.role === 'admin';
+  } catch (err) {
+    return false;
   }
-  
-  // If not in session, user needs to log out and log back in
-  // to refresh their session with updated role
-  return false;
 }
 
 // GET /api/admin/marketing/content — Fetch marketing content (admin only)
@@ -27,10 +31,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const isAdmin = await isUserAdmin(user);
+    const isAdmin = await isUserAdmin(user.id);
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Unauthorized: Admin access required. Please log out and log back in to refresh your session.' },
+        { error: 'Unauthorized: Admin access required' },
         { status: 401 }
       );
     }
@@ -79,10 +83,10 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const isAdmin = await isUserAdmin(user);
+    const isAdmin = await isUserAdmin(user.id);
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Unauthorized: Admin access required. Please log out and log back in to refresh your session.' },
+        { error: 'Unauthorized: Admin access required' },
         { status: 401 }
       );
     }
@@ -139,10 +143,10 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const isAdmin = await isUserAdmin(user);
+    const isAdmin = await isUserAdmin(user.id);
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Unauthorized: Admin access required. Please log out and log back in to refresh your session.' },
+        { error: 'Unauthorized: Admin access required' },
         { status: 401 }
       );
     }
