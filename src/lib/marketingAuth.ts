@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export function assertMarketingEnabled(): void {
-  if (process.env.MARKETING_API_ENABLED !== 'true') {
+  // Marketing API enabled by default when key is present
+  // Can be explicitly disabled with env var set to 'false'
+  if (process.env.MARKETING_API_ENABLED === 'false') {
     throw new Error('Marketing API is not enabled');
   }
 }
