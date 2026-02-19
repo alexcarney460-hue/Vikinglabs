@@ -4,17 +4,18 @@ import { getSupabaseServer } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
 
-// Helper: Check if user is admin by querying the users table
+// Helper: Check if user is admin by checking auth metadata
 async function isUserAdmin(userId: string): Promise<boolean> {
   try {
     const supabase = getSupabaseServer();
-    const { data } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
     
-    return data?.role === 'admin';
+    // Get user from auth.users and check raw_user_meta_data
+    const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
+    
+    if (error || !user) return false;
+    
+    // Check if role is set in user metadata
+    return (user.user_metadata as any)?.role === 'admin';
   } catch (err) {
     return false;
   }
