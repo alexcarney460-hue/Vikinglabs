@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
+import { validateMCAuth } from '@/lib/mcAuth';
 
-export async function GET() {
-  const enabled = process.env.MARKETING_API_ENABLED === 'true';
-  const keySet = !!process.env.MARKETING_KEY;
+export async function GET(req: Request) {
+  const headersObj = Object.fromEntries(req.headers.entries()) as Record<string,string|undefined>;
+  const auth = validateMCAuth(headersObj);
+  if (!auth.ok) return NextResponse.json(auth.json, { status: auth.code });
 
-  return NextResponse.json({
-    status: 'ok',
-    marketing_api_enabled: enabled,
-    marketing_key_set: keySet,
-    timestamp: new Date().toISOString(),
-  });
+  const env = (process.env.VERCEL_ENV === 'production') ? 'prod' : 'dev';
+  return NextResponse.json({ ok: true, time: new Date().toISOString(), env }, { status: 200 });
 }
