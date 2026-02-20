@@ -70,7 +70,14 @@ export async function POST(req: NextRequest) {
     try {
       // Step 1: Generate voiceover
       const elevenLabs = getElevenLabsClient();
-      const scriptText = contentData.script || contentData.hook || 'Check out Viking Labs';
+      let scriptText = contentData.hook || 'Check out Viking Labs';
+      
+      // If script is an array, join it into a single string
+      if (Array.isArray(contentData.script)) {
+        scriptText = contentData.script.join(' ');
+      } else if (typeof contentData.script === 'string') {
+        scriptText = contentData.script;
+      }
 
       const voiceoverResult = await elevenLabs.generateVoiceover({
         text: scriptText,
