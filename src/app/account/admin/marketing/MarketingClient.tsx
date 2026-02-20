@@ -303,9 +303,9 @@ export function MarketingClient() {
                   </div>
                 )}
 
-                {status === 'posted' && item.platform_post_url && (
+                {status === 'posted' && (item.platform_post_url || item.platform_post_id) && (
                   <a
-                    href={item.platform_post_url}
+                    href={item.platform_post_url || `https://instagram.com/p/${item.platform_post_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
