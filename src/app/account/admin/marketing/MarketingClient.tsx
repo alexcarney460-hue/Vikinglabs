@@ -122,11 +122,17 @@ export function MarketingClient() {
       if (!genRes.ok) {
         const errorDetail = genData.error || JSON.stringify(genData);
         const stage = genData.stage || 'unknown';
+        const stages = genData.stages || [];
         console.error(`[Alfred] Error at stage ${stage}:`, errorDetail);
-        throw new Error(`${stage.toUpperCase()}: ${errorDetail}`);
+        console.error(`[Alfred] Completed stages:`, stages);
+        throw new Error(`Stage: ${stage.toUpperCase()}\nError: ${errorDetail}\nCompleted: ${stages.join(' → ')}`);
       }
 
-      setError(`✅ SUCCESS! Video generated and posted to Instagram\n🔗 URL: ${genData.postUrl || genData.post_url || 'See dashboard'}\n⏰ Posted at: ${new Date().toLocaleTimeString()}`);
+      if (genData.partial) {
+        setError(`⚠️ PARTIAL SUCCESS\n${genData.message}\n\nCompleted stages: ${(genData.stages || []).join(' → ')}`);
+      } else {
+        setError(`✅ SUCCESS! Video generated and posted to Instagram\n🔗 URL: ${genData.postUrl || genData.post_url || 'See dashboard'}\n⏰ Posted at: ${new Date().toLocaleTimeString()}`);
+      }
       setTimeout(() => loadContent(), 2000);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -160,7 +166,12 @@ export function MarketingClient() {
 
       {/* Error Message */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className={`rounded-lg border px-4 py-3 text-sm whitespace-pre-wrap ${
+          error.startsWith('✅') ? 'border-green-200 bg-green-50 text-green-700' :
+          error.startsWith('⚠️') ? 'border-yellow-200 bg-yellow-50 text-yellow-700' :
+          error.startsWith('⏳') ? 'border-blue-200 bg-blue-50 text-blue-700' :
+          'border-red-200 bg-red-50 text-red-700'
+        }`}>
           {error}
         </div>
       )}
