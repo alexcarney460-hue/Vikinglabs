@@ -23,7 +23,7 @@ interface VoiceoverResult {
   error?: string;
 }
 
-const DEFAULT_VOICE_ID = 'ErXwobaYp3GgM60xLJ2t'; // Bella - professional, clear
+const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel - professional female (standard)
 const API_URL = 'https://api.elevenlabs.io/v1';
 
 export class ElevenLabsClient {
