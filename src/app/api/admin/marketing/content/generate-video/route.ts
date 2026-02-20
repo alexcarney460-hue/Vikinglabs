@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check auth
@@ -36,7 +36,8 @@ export async function POST(
       );
     }
 
-    const contentId = params.id;
+    const { id } = await params;
+    const contentId = id;
     const body = await req.json();
     const { template = 'bold_minimal_v1', primaryColor, accentColor, duration } = body;
 
