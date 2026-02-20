@@ -9,10 +9,20 @@ export function assertMarketingEnabled(): void {
 }
 
 export function assertMarketingKey(req: NextRequest): void {
-  const key = req.headers.get('x-marketing-key');
+  // Try multiple header formats for compatibility
+  let key = req.headers.get('x-marketing-key') || 
+            req.headers.get('MARKETING_KEY') || 
+            req.headers.get('marketing-key');
+  
   const expected = process.env.MARKETING_KEY;
 
-  if (!key || !expected || key !== expected) {
+  if (!key || !expected) {
+    console.error('[AUTH] Missing key. Received:', key ? 'key present' : 'no key', 'Expected:', expected ? 'set' : 'not set');
+    throw new Error('Invalid or missing marketing API key');
+  }
+  
+  if (key !== expected) {
+    console.error('[AUTH] Key mismatch. Received:', key.slice(0, 10) + '...', 'Expected:', expected.slice(0, 10) + '...');
     throw new Error('Invalid or missing marketing API key');
   }
 }
