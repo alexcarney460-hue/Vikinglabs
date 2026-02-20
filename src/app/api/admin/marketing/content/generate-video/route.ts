@@ -4,26 +4,14 @@ import { authOptions } from '@/lib/authjs/options';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { getElevenLabsClient } from '@/lib/elevenlabs-tts';
 import { generateVideoFromTemplate } from '@/lib/video-template';
-import { writeFileSync, unlinkSync, mkdirSync } from 'fs';
+import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * POST /api/admin/marketing/content/generate-video
- * Generates video from brief using ElevenLabs TTS + template system
- * 
- * Body:
- * - contentId: string (UUID)
- * - template: 'bold_minimal_v1' | 'bold_minimal_v2' | 'bold_minimal_v3'
- * - primaryColor?: string (hex)
- * - accentColor?: string (hex)
- * - duration?: number (seconds, default 15)
- */
 export async function POST(req: NextRequest) {
   try {
-    // Check auth
     const session = await getServerSession(authOptions);
     const user = session?.user as { role?: string; email?: string } | undefined;
     
@@ -35,16 +23,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { contentId, template = 'bold_minimal_v1', primaryColor, accentColor, duration } = body;
+    const { contentId, template = 'bold_minimal_v1', primaryColor = '#000000', accentColor = '#FFFFFF', duration = 15 } = body;
 
     if (!contentId) {
-      return NextResponse.json(
-        { error: 'Missing contentId in request body' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing contentId' }, { status: 400 });
     }
 
-    // Fetch content from database
     const supabase = getSupabaseServer();
     const { data: contentData, error: fetchError } = await supabase
       .from('marketing_content_queue')
@@ -53,39 +37,33 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (fetchError || !contentData) {
-      return NextResponse.json(
-        { error: 'Content not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Content not found' }, { status: 404 });
     }
 
-    // Generate voiceover from script
-    const elevenLabs = getElevenLabsClient();
-    const scriptText = contentData.script || contentData.hook || 'Check out Viking Labs';
-
-    const voiceoverResult = await elevenLabs.generateVoiceover({
-      text: scriptText,
-    });
-
-    if (!voiceoverResult.success || !voiceoverResult.audioBuffer) {
-      return NextResponse.json(
-        { error: `Failed to generate voiceover: ${voiceoverResult.error}` },
-        { status: 500 }
-      );
-    }
-
-    // Save voiceover temporarily
-    const voiceoverPath = join(tmpdir(), `vl-voiceover-${contentId}.mp3`);
-    writeFileSync(voiceoverPath, voiceoverResult.audioBuffer);
+    let voiceoverPath = '';
 
     try {
-      // Generate video
+      const elevenLabs = getElevenLabsClient();
+      const scriptText = contentData.script || contentData.hook || 'Check out Viking Labs';
+
+      const voiceoverResult = await elevenLabs.generateVoiceover({ text: scriptText });
+
+      if (!voiceoverResult.success || !voiceoverResult.audioBuffer) {
+        return NextResponse.json(
+          { error: `Failed to generate voiceover: ${voiceoverResult.error}` },
+          { status: 500 }
+        );
+      }
+
+      voiceoverPath = join(tmpdir(), `vl-voiceover-${contentId}-${Date.now()}.mp3`);
+      writeFileSync(voiceoverPath, voiceoverResult.audioBuffer);
+
       const videoResult = await generateVideoFromTemplate({
         template: template as any,
         text: contentData.hook || 'Viking Labs',
-        primaryColor: primaryColor || '#000000',
-        accentColor: accentColor || '#FFFFFF',
-        duration: duration || 15,
+        primaryColor,
+        accentColor,
+        duration,
         voiceoverFile: voiceoverPath,
       });
 
@@ -96,7 +74,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Update content with video generation metadata
       const { error: updateError } = await supabase
         .from('marketing_content_queue')
         .update({
@@ -120,19 +97,15 @@ export async function POST(req: NextRequest) {
         message: 'Video generated successfully',
       });
     } finally {
-      // Clean up voiceover
-      try {
-        unlinkSync(voiceoverPath);
-      } catch {}
+      if (voiceoverPath) {
+        try {
+          unlinkSync(voiceoverPath);
+        } catch {}
+      }
     }
   } catch (err) {
     return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : 'Failed to generate video',
-      },
+      { error: err instanceof Error ? err.message : 'Failed to generate video' },
       { status: 500 }
     );
   }
