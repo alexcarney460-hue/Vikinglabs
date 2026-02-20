@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authjs/options';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { getElevenLabsClient } from '@/lib/elevenlabs-tts';
-import { generateVideoFromTemplate } from '@/lib/video-template';
+import { generateVideoWithRunway, createVideoPrompt } from '@/lib/runway-video';
 import { postToInstagram } from '@/lib/instagram-poster';
 import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
@@ -90,17 +90,21 @@ export async function POST(req: NextRequest) {
       voiceoverPath = join(tmpdir(), `vl-voiceover-${contentId}-${Date.now()}.mp3`);
       writeFileSync(voiceoverPath, voiceoverResult.audioBuffer);
 
-      // Step 2: Generate video
-      const videoResult = await generateVideoFromTemplate({
-        template: template as any,
-        text: contentData.hook || 'Viking Labs',
+      // Step 2: Generate video with Runway
+      const videoPrompt = createVideoPrompt(
+        contentData.hook || 'Viking Labs',
+        contentData.caption || '',
         primaryColor,
-        accentColor,
-        duration: 15,
-        voiceoverFile: voiceoverPath,
+        accentColor
+      );
+
+      const videoResult = await generateVideoWithRunway(videoPrompt, {
+        duration: 5,
+        width: 1080,
+        height: 1920,
       });
 
-      if (!videoResult.success || !videoResult.videoPath) {
+      if (!videoResult.success || !videoResult.videoBuffer) {
         return NextResponse.json(
           {
             error: `Failed to generate video: ${videoResult.error}`,
@@ -110,7 +114,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      videoPath = videoResult.videoPath;
+      // Save video buffer to temp file for Instagram posting
+      videoPath = join(tmpdir(), `vl-video-${contentId}-${Date.now()}.mp4`);
+      writeFileSync(videoPath, videoResult.videoBuffer);
 
       // Step 3: Post to Instagram
       const igUsername = process.env.INSTAGRAM_USERNAME;
