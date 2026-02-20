@@ -286,26 +286,34 @@ export function MarketingClient() {
 
               {/* Actions */}
               <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                {status !== 'approved' && (
+                {status === 'draft' && (
                   <button
                     onClick={() => updateStatus(item.id, 'approved')}
                     disabled={updating[item.id]}
                     className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                   >
-                    Approve
+                    {updating[item.id] ? 'Generating & Posting...' : 'Approve & Auto-Generate'}
                   </button>
                 )}
 
-                {(status === 'approved' || status === 'draft') && (
-                  <button
-                    onClick={() => setSelectedForUpload(item.id)}
-                    className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
+                {status === 'approved' && (
+                  <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 border border-blue-200">
+                    ✅ Video generated & posted!
+                  </div>
+                )}
+
+                {status === 'posted' && item.platform_post_url && (
+                  <a
+                    href={item.platform_post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
                   >
-                    Upload & Post Video
-                  </button>
+                    View on Instagram →
+                  </a>
                 )}
 
-                {status !== 'killed' && (
+                {status !== 'killed' && status !== 'posted' && (
                   <button
                     onClick={() => updateStatus(item.id, 'killed')}
                     disabled={updating[item.id]}
@@ -315,20 +323,6 @@ export function MarketingClient() {
                   </button>
                 )}
               </div>
-
-              {/* Video Upload Form */}
-              {selectedForUpload === item.id && (
-                <div className="mt-4">
-                  <VideoUploadForm
-                    contentId={item.id}
-                    onSuccess={() => {
-                      setSelectedForUpload(null);
-                      loadContent();
-                    }}
-                    onError={(err) => setError(err)}
-                  />
-                </div>
-              )}
             </div>
           ))}
         </div>
