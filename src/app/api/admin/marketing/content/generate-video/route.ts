@@ -11,19 +11,17 @@ import { tmpdir } from 'os';
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/admin/marketing/content/generate-video/{id}
+ * POST /api/admin/marketing/content/generate-video
  * Generates video from brief using ElevenLabs TTS + template system
  * 
  * Body:
+ * - contentId: string (UUID)
  * - template: 'bold_minimal_v1' | 'bold_minimal_v2' | 'bold_minimal_v3'
  * - primaryColor?: string (hex)
  * - accentColor?: string (hex)
  * - duration?: number (seconds, default 15)
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest) {
   try {
     // Check auth
     const session = await getServerSession(authOptions);
@@ -36,10 +34,15 @@ export async function POST(
       );
     }
 
-    const { id } = await params;
-    const contentId = id;
     const body = await req.json();
-    const { template = 'bold_minimal_v1', primaryColor, accentColor, duration } = body;
+    const { contentId, template = 'bold_minimal_v1', primaryColor, accentColor, duration } = body;
+
+    if (!contentId) {
+      return NextResponse.json(
+        { error: 'Missing contentId in request body' },
+        { status: 400 }
+      );
+    }
 
     // Fetch content from database
     const supabase = getSupabaseServer();
