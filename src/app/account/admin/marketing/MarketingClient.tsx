@@ -101,6 +101,8 @@ export function MarketingClient() {
 
   async function generateAndPostVideo(id: string) {
     try {
+      console.log('[Alfred] Starting video generation for:', id);
+      
       const genRes = await fetch(`/api/admin/marketing/content/generate-and-post`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,15 +114,18 @@ export function MarketingClient() {
         }),
       });
 
+      const genData = await genRes.json();
+      console.log('[Alfred] Endpoint response:', genData, 'Status:', genRes.status);
+
       if (!genRes.ok) {
-        const genData = await genRes.json();
-        throw new Error(`${genData.error} (${genData.stage})`);
+        throw new Error(`${genData.error} (${genData.stage || 'unknown'})`);
       }
 
-      const genResult = await genRes.json();
-      setError(`✅ Video generated and posted! URL: ${genResult.postUrl}`);
+      setError(`✅ Video generated and posted! Check Instagram: ${genData.postUrl || 'processing...'}`);
     } catch (err) {
-      setError(`Auto-generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Alfred] Auto-generation error:', errorMsg);
+      setError(`❌ Auto-generation failed: ${errorMsg}`);
     }
   }
 
