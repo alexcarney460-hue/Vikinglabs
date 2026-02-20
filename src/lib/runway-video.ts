@@ -45,16 +45,15 @@ export async function generateVideoWithRunway(
     console.log('[runway-video] Prompt length:', prompt.length);
     console.log('[runway-video] Duration:', duration, 'Ratio:', ratio);
 
-    // Submit generation task
+    // Submit generation task (no version header - use body version instead)
     const taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'X-Runway-Version': '2024-11-06',
       },
       body: JSON.stringify({
-        model: 'gen4.5', // gen4.5 is the current supported model
+        model: 'gen4.5',
         promptText: prompt,
         ratio,
         duration,
@@ -107,7 +106,6 @@ export async function generateVideoWithRunway(
         {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
-            'X-Runway-Version': '2024-11-06',
           },
         }
       );
