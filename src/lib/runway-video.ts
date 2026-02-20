@@ -3,7 +3,7 @@
  * Generates videos from text prompts using Runway's Gen-3 API
  */
 
-const RUNWAY_API_URL = 'https://api.runwayml.com/v1';
+const RUNWAY_API_URL = 'https://api.dev.runwayml.com/v1';
 
 interface RunwayGenerationRequest {
   prompt: string;
