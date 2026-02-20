@@ -1,16 +1,10 @@
 /**
  * Runway ML Video Generation
- * Generates videos from text prompts using Runway's Gen-3 API
+ * Generates videos using Runway's API (Gen-4.5 / Gen-3)
+ * Docs: https://docs.dev.runwayml.com/
  */
 
 const RUNWAY_API_URL = 'https://api.dev.runwayml.com/v1';
-
-interface RunwayGenerationRequest {
-  prompt: string;
-  duration?: number;
-  width?: number;
-  height?: number;
-}
 
 interface RunwayGenerationResult {
   success: boolean;
@@ -22,7 +16,8 @@ interface RunwayGenerationResult {
 }
 
 /**
- * Generate video using Runway Gen-3 API
+ * Generate video using Runway API
+ * Uses image_to_video endpoint with promptText (text-only, no image required)
  */
 export async function generateVideoWithRunway(
   prompt: string,
@@ -38,13 +33,17 @@ export async function generateVideoWithRunway(
     if (!apiKey) {
       return {
         success: false,
-        error: 'Runway API key not configured',
+        error: 'RUNWAY_API_KEY not configured in environment variables',
       };
     }
 
     const duration = options?.duration || 5;
-    const width = options?.width || 1080;
-    const height = options?.height || 1920;
+    // Use ratio format for Runway API (vertical for Reels)
+    const ratio = '720:1280'; // 9:16 vertical
+
+    console.log('[runway-video] Submitting generation task...');
+    console.log('[runway-video] Prompt length:', prompt.length);
+    console.log('[runway-video] Duration:', duration, 'Ratio:', ratio);
 
     // Submit generation task
     const taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
@@ -52,87 +51,107 @@ export async function generateVideoWithRunway(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'X-Runway-Version': '2024-06',
+        'X-Runway-Version': '2024-11-15',
       },
       body: JSON.stringify({
-        prompt,
+        model: 'gen3a_turbo', // Use gen3a_turbo for faster/cheaper, or 'gen4' for higher quality
+        promptText: prompt,
+        ratio,
         duration,
-        width,
-        height,
-        model: 'gen3',
       }),
     });
 
+    const responseText = await taskResponse.text();
+    console.log('[runway-video] Task response status:', taskResponse.status);
+    console.log('[runway-video] Task response body:', responseText);
+
     if (!taskResponse.ok) {
-      const error = await taskResponse.text();
       return {
         success: false,
-        error: `Runway API error: ${taskResponse.status} - ${error}`,
+        error: `Runway API error: ${taskResponse.status} - ${responseText}`,
       };
     }
 
-    const taskData = await taskResponse.json() as any;
-    const taskId = taskData.id;
+    let taskData: any;
+    try {
+      taskData = JSON.parse(responseText);
+    } catch {
+      return {
+        success: false,
+        error: `Runway returned non-JSON response: ${responseText.substring(0, 200)}`,
+      };
+    }
 
+    const taskId = taskData.id;
     if (!taskId) {
       return {
         success: false,
-        error: 'No task ID returned from Runway',
+        error: `No task ID returned from Runway. Response: ${JSON.stringify(taskData)}`,
       };
     }
+
+    console.log('[runway-video] Task created:', taskId);
 
     // Poll for completion (max 5 minutes)
     let completed = false;
     let videoUrl: string | undefined;
     let attempts = 0;
-    const maxAttempts = 60; // 5 minutes with 5-second polling
+    const maxAttempts = 60;
 
     while (!completed && attempts < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
+      await new Promise((resolve) => setTimeout(resolve, 5000));
       attempts++;
 
       const statusResponse = await fetch(
-        `${RUNWAY_API_URL}/image_to_video/${taskId}`,
+        `${RUNWAY_API_URL}/tasks/${taskId}`,
         {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
-            'X-Runway-Version': '2024-06',
+            'X-Runway-Version': '2024-11-15',
           },
         }
       );
 
       if (statusResponse.ok) {
         const statusData = await statusResponse.json() as any;
+        console.log(`[runway-video] Poll ${attempts}: status=${statusData.status}`);
 
         if (statusData.status === 'SUCCEEDED') {
           completed = true;
-          videoUrl = statusData.output?.[0]; // First output video
+          videoUrl = statusData.output?.[0];
+          console.log('[runway-video] Success! Video URL:', videoUrl);
         } else if (statusData.status === 'FAILED') {
+          console.error('[runway-video] Generation failed:', JSON.stringify(statusData));
           return {
             success: false,
-            error: `Runway generation failed: ${statusData.error}`,
+            error: `Runway generation failed: ${statusData.failure || statusData.failureCode || 'unknown'}`,
           };
         }
+        // THROTTLED, RUNNING, PENDING - keep polling
+      } else {
+        console.warn(`[runway-video] Status poll failed: ${statusResponse.status}`);
       }
     }
 
     if (!completed || !videoUrl) {
       return {
         success: false,
-        error: 'Runway video generation timed out or no output URL',
+        error: `Runway video generation timed out after ${attempts * 5}s (${attempts} polls)`,
       };
     }
 
     // Download the video
+    console.log('[runway-video] Downloading video...');
     const videoResponse = await fetch(videoUrl);
     if (!videoResponse.ok) {
       return {
         success: false,
-        error: `Failed to download generated video: ${videoResponse.status}`,
+        error: `Failed to download video: ${videoResponse.status}`,
       };
     }
 
     const videoBuffer = await videoResponse.arrayBuffer();
+    console.log('[runway-video] Downloaded', videoBuffer.byteLength, 'bytes');
 
     return {
       success: true,
@@ -142,9 +161,11 @@ export async function generateVideoWithRunway(
       taskId,
     };
   } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[runway-video] Fatal error:', msg);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to generate video with Runway',
+      error: msg,
     };
   }
 }
@@ -158,32 +179,6 @@ export function createVideoPrompt(
   primaryColor: string,
   accentColor: string
 ): string {
-  return `
-Create a 5-second Instagram Reel video with these specifications:
-
-TEXT CONTENT: "${hook}"
-
-VISUAL STYLE:
-- Bold and minimalist design
-- Primary color background: ${primaryColor}
-- Text color: ${accentColor}
-- Professional, lab-grade aesthetic
-- Modern typography, clean lines
-- No people, no faces, focus on product/abstract concepts
-
-BRANDING:
-- Viking Labs - premium peptide research
-- Scientific, trustworthy, innovative vibe
-- High quality, professional production
-
-ANIMATION:
-- Subtle fade in/out transitions
-- Text appears at 0.5s, stays visible, fades at 4.5s
-- Smooth, elegant motion
-- No text-to-speech voiceover needed
-
-ASPECT RATIO: 9:16 (vertical for Instagram Reels)
-DURATION: 5 seconds
-QUALITY: High definition, 1080x1920
-`;
+  // Keep prompts concise for Runway - they work better with visual descriptions
+  return `Cinematic 5-second vertical video. Bold text "${hook}" appearing with smooth animation on a ${primaryColor} background. Professional, minimalist design with ${accentColor} accents. Clean typography, lab-grade scientific aesthetic. Subtle particle effects and elegant motion. Premium peptide research brand feel.`;
 }
