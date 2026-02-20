@@ -8,13 +8,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 export const dynamic = 'force-dynamic';
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '500mb',
-    },
-  },
-};
+export const maxDuration = 300; // 5 minutes for large video uploads
 
 /**
  * POST /api/admin/marketing/content/upload

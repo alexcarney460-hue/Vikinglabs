@@ -27,6 +27,7 @@ interface ContentItem {
   engagement_rate?: number | null;
   posted_at?: string | null;
   platform_post_id?: string | null;
+  platform_post_url?: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
