@@ -52,7 +52,6 @@ export async function generateVideoWithRunway(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'X-Runway-Version': '2024-11-15',
       },
       body: JSON.stringify({
         prompt,
@@ -96,7 +95,6 @@ export async function generateVideoWithRunway(
         {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
-            'X-Runway-Version': '2024-11-15',
           },
         }
       );
