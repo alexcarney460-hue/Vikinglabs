@@ -102,6 +102,7 @@ export function MarketingClient() {
   async function generateAndPostVideo(id: string) {
     try {
       console.log('[Alfred] Starting video generation for:', id);
+      setError('⏳ Generating video... this takes 5-10 minutes');
       
       const genRes = await fetch(`/api/admin/marketing/content/generate-and-post`, {
         method: 'POST',
@@ -115,17 +116,22 @@ export function MarketingClient() {
       });
 
       const genData = await genRes.json();
-      console.log('[Alfred] Endpoint response:', genData, 'Status:', genRes.status);
+      console.log('[Alfred] Full endpoint response:', JSON.stringify(genData, null, 2));
+      console.log('[Alfred] Response status:', genRes.status);
 
       if (!genRes.ok) {
-        throw new Error(`${genData.error} (${genData.stage || 'unknown'})`);
+        const errorDetail = genData.error || JSON.stringify(genData);
+        const stage = genData.stage || 'unknown';
+        console.error(`[Alfred] Error at stage ${stage}:`, errorDetail);
+        throw new Error(`${stage.toUpperCase()}: ${errorDetail}`);
       }
 
-      setError(`✅ Video generated and posted! Check Instagram: ${genData.postUrl || 'processing...'}`);
+      setError(`✅ SUCCESS! Video generated and posted to Instagram\n🔗 URL: ${genData.postUrl || genData.post_url || 'See dashboard'}\n⏰ Posted at: ${new Date().toLocaleTimeString()}`);
+      setTimeout(() => loadContent(), 2000);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[Alfred] Auto-generation error:', errorMsg);
-      setError(`❌ Auto-generation failed: ${errorMsg}`);
+      console.error('[Alfred] FULL ERROR:', errorMsg);
+      setError(`❌ FAILED\n${errorMsg}\n\n📋 Check browser console (F12) for full details`);
     }
   }
 
