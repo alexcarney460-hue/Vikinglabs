@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authjs/options';
 import { getSupabaseServer } from '@/lib/supabaseServer';
+import { v4 as uuidv4 } from 'uuid';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,85 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       { error: (err instanceof Error ? err.message : 'Unknown error') || 'Failed to update content' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/admin/marketing/content — Create new marketing content draft
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { role?: string; email?: string } | undefined;
+    
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    
+    // Validate required fields
+    const requiredFields = ['platform', 'hook', 'caption', 'hashtags'];
+    for (const field of requiredFields) {
+      if (!body[field]) {
+        return NextResponse.json(
+          { error: `Missing required field: ${field}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const supabase = getSupabaseServer();
+    
+    const contentId = uuidv4();
+    const now = new Date().toISOString();
+
+    const newContent = {
+      id: contentId,
+      platform: body.platform,
+      format: body.format || 'reel',
+      hook: body.hook,
+      caption: body.caption,
+      hashtags: body.hashtags,
+      compliance: body.compliance || {
+        risk_score: 0,
+        flags: [],
+        notes: 'Auto-created via Mission Control'
+      },
+      status: 'draft',
+      created_at: now,
+      updated_at: now,
+      created_by: user.email || 'system'
+    };
+
+    const { data, error } = await supabase
+      .from('marketing_content_queue')
+      .insert([newContent])
+      .select();
+
+    if (error) {
+      console.error('[POST /api/admin/marketing/content] Supabase insert error:', error);
+      return NextResponse.json(
+        { error: `Failed to create content: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      { 
+        success: true, 
+        data: data?.[0],
+        message: 'Draft created successfully'
+      },
+      { status: 201 }
+    );
+  } catch (err) {
+    console.error('[POST /api/admin/marketing/content] Error:', err);
+    return NextResponse.json(
+      { error: (err instanceof Error ? err.message : 'Unknown error') || 'Failed to create content' },
       { status: 500 }
     );
   }
