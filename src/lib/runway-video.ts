@@ -45,13 +45,13 @@ export async function generateVideoWithRunway(
     console.log('[runway-video] Prompt length:', prompt.length);
     console.log('[runway-video] Duration:', duration, 'Ratio:', ratio);
 
-    // Submit generation task (no version header - use body version instead)
+    // Submit generation task
     const taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'Runway-Version': '2024-11-15',
+        'X-Runway-Version': '2024-11-15',
       },
       body: JSON.stringify({
         model: 'gen-4.5',
