@@ -90,7 +90,7 @@ export async function generateVideoWithRunway(
 
     // Submit generation task (version header configurable; retry without it if rejected)
     const submitBody = JSON.stringify({
-      model: 'gen-4.5',
+      model: 'gen4.5',
       promptText: prompt,
       ratio,
       duration,
