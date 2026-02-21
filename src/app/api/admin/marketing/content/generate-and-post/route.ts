@@ -162,14 +162,28 @@ export async function POST(req: NextRequest) {
       // If no Graph API creds, skip Instagram posting and just save the video info
       log('instagram', 'No Instagram Graph API credentials - skipping post, saving video only');
       
-      const { error: updateError } = await supabase
+      // Persist generation metadata for manual posting.
+      // If DB schema doesn't yet have video_url, fall back without blocking.
+      let { error: updateError } = await supabase
         .from('marketing_content_queue')
         .update({
           status: 'approved',
           video_generated_at: new Date().toISOString(),
           video_template: template,
+          video_url: videoResult.videoUrl,
         })
         .eq('id', contentId);
+
+      if (updateError?.message?.toLowerCase().includes('video_url')) {
+        ({ error: updateError } = await supabase
+          .from('marketing_content_queue')
+          .update({
+            status: 'approved',
+            video_generated_at: new Date().toISOString(),
+            video_template: template,
+          })
+          .eq('id', contentId));
+      }
 
       return NextResponse.json({
         success: true,
@@ -179,6 +193,7 @@ export async function POST(req: NextRequest) {
         stages,
         videoGenerated: true,
         instagramPosted: false,
+        videoUrl: videoResult.videoUrl,
       });
     }
 
@@ -208,7 +223,8 @@ export async function POST(req: NextRequest) {
 
     // ─── Stage 7: Update database ───
     log('db_update', 'Updating content status...');
-    const { error: updateError } = await supabase
+    // Update record; tolerate missing video_url column.
+    let { error: updateError } = await supabase
       .from('marketing_content_queue')
       .update({
         status: 'posted',
@@ -217,8 +233,23 @@ export async function POST(req: NextRequest) {
         platform_post_url: postResult.postUrl,
         video_template: template,
         video_generated_at: new Date().toISOString(),
+        video_url: videoResult.videoUrl,
       })
       .eq('id', contentId);
+
+    if (updateError?.message?.toLowerCase().includes('video_url')) {
+      ({ error: updateError } = await supabase
+        .from('marketing_content_queue')
+        .update({
+          status: 'posted',
+          posted_at: new Date().toISOString(),
+          platform_post_id: postResult.postId,
+          platform_post_url: postResult.postUrl,
+          video_template: template,
+          video_generated_at: new Date().toISOString(),
+        })
+        .eq('id', contentId));
+    }
 
     if (updateError) {
       log('db_update', 'Update failed', { error: updateError.message });
@@ -235,6 +266,7 @@ export async function POST(req: NextRequest) {
       contentId,
       postUrl: postResult.postUrl,
       postId: postResult.postId,
+      videoUrl: videoResult.videoUrl,
       message: 'Video generated and posted to Instagram successfully',
       stages,
     });

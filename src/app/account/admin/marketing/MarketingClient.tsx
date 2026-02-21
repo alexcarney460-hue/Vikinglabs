@@ -19,6 +19,12 @@ interface ContentItem {
   compliance: ComplianceData;
   status: string;
   created_at: string;
+
+  // Generation / posting metadata
+  video_url?: string | null; // Runway-generated (public) video URL
+  video_generated_at?: string | null;
+  video_template?: string | null;
+
   views?: number | null;
   likes?: number | null;
   comments?: number | null;
@@ -188,12 +194,61 @@ export function MarketingClient() {
       )}
 
       {!loading && content.length > 0 && (
-        <div className="space-y-4">
-          {content.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
-            >
+        <div className="space-y-6">
+          {status === 'approved' && content.some((c) => !!c.video_url) && (
+            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900">Generated Videos (manual posting)</h3>
+                <p className="text-xs text-slate-500">Videos generated but not necessarily posted</p>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {content
+                  .filter((c) => !!c.video_url)
+                  .map((c) => (
+                    <div key={c.id} className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs text-slate-600">
+                          <span className="font-semibold text-slate-900">{c.platform.toUpperCase()}</span>
+                          {' • '}
+                          <span className="font-mono">{c.id}</span>
+                          {c.video_generated_at ? (
+                            <> {' • '} generated {new Date(c.video_generated_at).toLocaleString()}</>
+                          ) : null}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            href={c.video_url!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                          >
+                            Open Video URL →
+                          </a>
+                          <button
+                            onClick={() => copyToClipboard(`${c.caption}\n\n${(c.hashtags || []).join(' ')}`)}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-slate-300"
+                          >
+                            Copy caption + hashtags
+                          </button>
+                        </div>
+                      </div>
+
+                      <p className="mt-2 text-sm text-slate-900">{c.hook}</p>
+                      <p className="mt-1 text-xs text-slate-600 line-clamp-2">{c.caption}</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {content.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+              >
               {/* Header */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex gap-2">
@@ -380,6 +435,7 @@ export function MarketingClient() {
               )}
             </div>
           ))}
+        </div>
         </div>
       )}
     </div>
