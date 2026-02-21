@@ -4,7 +4,50 @@
  * Docs: https://docs.dev.runwayml.com/
  */
 
-const RUNWAY_API_URL = 'https://api.dev.runwayml.com/v1';
+const RUNWAY_API_URL = process.env.RUNWAY_API_URL || 'https://api.dev.runwayml.com/v1';
+
+type RunwayHeaderConfig = {
+  headerName?: string;
+  headerValue?: string;
+};
+
+function getRunwayVersionHeader(): RunwayHeaderConfig {
+  const headerValue = process.env.RUNWAY_API_VERSION?.trim();
+  if (!headerValue) return {};
+  const headerName = (
+    process.env.RUNWAY_VERSION_HEADER ||
+    process.env.RUNWAY_API_VERSION_HEADER ||
+    'X-Runway-Version'
+  ).trim();
+  return { headerName, headerValue };
+}
+
+function buildRunwayHeaders(
+  apiKey: string,
+  options?: { includeContentType?: boolean; omitVersion?: boolean }
+) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  if (options?.includeContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const { headerName, headerValue } = getRunwayVersionHeader();
+  if (headerName && headerValue && !options?.omitVersion) {
+    headers[headerName] = headerValue;
+  }
+
+  return { headers, hasVersionHeader: !!(headerName && headerValue) };
+}
+
+function shouldRetryWithoutVersion(status: number, responseText: string) {
+  if (status < 400 || status >= 500) return false;
+  return /version|x-runway-version|runway-version|unsupported header|invalid header/i.test(
+    responseText
+  );
+}
 
 interface RunwayGenerationResult {
   success: boolean;
@@ -45,22 +88,40 @@ export async function generateVideoWithRunway(
     console.log('[runway-video] Prompt length:', prompt.length);
     console.log('[runway-video] Duration:', duration, 'Ratio:', ratio);
 
-    // Submit generation task (NO version header - Runway rejects it on this endpoint)
-    const taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gen-4.5',
-        promptText: prompt,
-        ratio,
-        duration,
-      }),
+    // Submit generation task (version header configurable; retry without it if rejected)
+    const submitBody = JSON.stringify({
+      model: 'gen-4.5',
+      promptText: prompt,
+      ratio,
+      duration,
     });
 
-    const responseText = await taskResponse.text();
+    const { headers: submitHeaders, hasVersionHeader } = buildRunwayHeaders(apiKey, {
+      includeContentType: true,
+    });
+
+    let taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
+      method: 'POST',
+      headers: submitHeaders,
+      body: submitBody,
+    });
+
+    let responseText = await taskResponse.text();
+
+    if (!taskResponse.ok && hasVersionHeader && shouldRetryWithoutVersion(taskResponse.status, responseText)) {
+      console.warn('[runway-video] Version header rejected; retrying without version header...');
+      const { headers: retryHeaders } = buildRunwayHeaders(apiKey, {
+        includeContentType: true,
+        omitVersion: true,
+      });
+      taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
+        method: 'POST',
+        headers: retryHeaders,
+        body: submitBody,
+      });
+      responseText = await taskResponse.text();
+    }
+
     console.log('[runway-video] Task response status:', taskResponse.status);
     console.log('[runway-video] Task response body:', responseText);
 
@@ -101,17 +162,27 @@ export async function generateVideoWithRunway(
       await new Promise((resolve) => setTimeout(resolve, 5000));
       attempts++;
 
-      const statusResponse = await fetch(
-        `${RUNWAY_API_URL}/tasks/${taskId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-          },
+      const { headers: statusHeaders, hasVersionHeader: statusHasVersion } = buildRunwayHeaders(apiKey);
+      let statusResponse = await fetch(`${RUNWAY_API_URL}/tasks/${taskId}`, {
+        headers: statusHeaders,
+      });
+
+      let statusText: string | undefined;
+
+      if (!statusResponse.ok && statusHasVersion) {
+        statusText = await statusResponse.text();
+        if (shouldRetryWithoutVersion(statusResponse.status, statusText)) {
+          console.warn('[runway-video] Version header rejected on status poll; retrying without version header...');
+          const { headers: retryHeaders } = buildRunwayHeaders(apiKey, { omitVersion: true });
+          statusResponse = await fetch(`${RUNWAY_API_URL}/tasks/${taskId}`, {
+            headers: retryHeaders,
+          });
+          statusText = undefined;
         }
-      );
+      }
 
       if (statusResponse.ok) {
-        const statusData = await statusResponse.json() as any;
+        const statusData = (await statusResponse.json()) as any;
         console.log(`[runway-video] Poll ${attempts}: status=${statusData.status}`);
 
         if (statusData.status === 'SUCCEEDED') {
@@ -127,7 +198,8 @@ export async function generateVideoWithRunway(
         }
         // THROTTLED, RUNNING, PENDING - keep polling
       } else {
-        console.warn(`[runway-video] Status poll failed: ${statusResponse.status}`);
+        if (!statusText) statusText = await statusResponse.text().catch(() => '');
+        console.warn(`[runway-video] Status poll failed: ${statusResponse.status} ${statusText ? `- ${statusText}` : ''}`);
       }
     }
 

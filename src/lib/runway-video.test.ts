@@ -1,16 +1,21 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
 import { generateVideoWithRunway } from './runway-video';
 
-// Unit test: ensure headers and body are constructed (mock fetch)
-// This is a lightweight test that doesn't hit Runway; it verifies header creation logic.
+// Lightweight unit test that doesn't hit Runway.
+// Verifies we fail fast without an API key (avoids network calls in CI).
 
 describe('runway-video', () => {
-  it('should build headers with Runway-Version', async () => {
-    // Simple smoke: call the function with missing API key to exercise early exit
+  it('fails fast when RUNWAY_API_KEY is missing', async () => {
     const original = process.env.RUNWAY_API_KEY;
     delete process.env.RUNWAY_API_KEY;
+
     const res = await generateVideoWithRunway('test prompt', { duration: 1 });
-    expect(res.success).toBe(false);
-    expect(res.error).toMatch(/RUNWAY_API_KEY not configured/);
+
+    assert.equal(res.success, false);
+    assert.match(res.error ?? '', /RUNWAY_API_KEY not configured/);
+
     if (original) process.env.RUNWAY_API_KEY = original;
   });
 });
