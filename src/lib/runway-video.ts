@@ -105,7 +105,8 @@ export async function generateVideoWithRunway(
       includeContentType: true,
     });
 
-    let taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
+    const endpoint = promptImage ? 'image_to_video' : 'text_to_video';
+    let taskResponse = await fetch(`${RUNWAY_API_URL}/${endpoint}`, {
       method: 'POST',
       headers: submitHeaders,
       body: submitBody,
@@ -119,7 +120,7 @@ export async function generateVideoWithRunway(
         includeContentType: true,
         omitVersion: true,
       });
-      taskResponse = await fetch(`${RUNWAY_API_URL}/image_to_video`, {
+      taskResponse = await fetch(`${RUNWAY_API_URL}/${endpoint}`, {
         method: 'POST',
         headers: retryHeaders,
         body: submitBody,
