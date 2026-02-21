@@ -51,6 +51,7 @@ export async function generateVideoWithRunway(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'X-Runway-Version': '2024-11',
       },
       body: JSON.stringify({
         model: 'gen-4.5',
