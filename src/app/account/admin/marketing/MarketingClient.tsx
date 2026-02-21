@@ -49,6 +49,7 @@ export function MarketingClient() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [error, setError] = useState('');
   const [selectedForUpload, setSelectedForUpload] = useState<string | null>(null);
+  const [generateStates, setGenerateStates] = useState<Record<string, { status: 'idle' | 'running' | 'success' | 'error'; response?: any }>>({});
 
   useEffect(() => {
     loadContent();
@@ -85,11 +86,6 @@ export function MarketingClient() {
         throw new Error(data.error || 'Failed to update');
       }
 
-      // If approving, auto-generate video + post
-      if (newStatus === 'approved') {
-        await generateAndPostVideo(id);
-      }
-
       // Reload content
       await loadContent();
     } catch (err) {
@@ -100,13 +96,18 @@ export function MarketingClient() {
   }
 
   async function generateAndPostVideo(id: string) {
+    setGenerateStates((prev) => ({
+      ...prev,
+      [id]: { status: 'running' },
+    }));
+
     try {
       console.log('[Alfred] Starting video generation for:', id);
-      setError('⏳ Generating video... this takes 5-10 minutes');
-      
+
       const genRes = await fetch(`/api/admin/marketing/content/generate-and-post`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           contentId: id,
           template: 'bold_minimal_v1',
@@ -120,24 +121,26 @@ export function MarketingClient() {
       console.log('[Alfred] Response status:', genRes.status);
 
       if (!genRes.ok) {
-        const errorDetail = genData.error || JSON.stringify(genData);
-        const stage = genData.stage || 'unknown';
-        const stages = genData.stages || [];
-        console.error(`[Alfred] Error at stage ${stage}:`, errorDetail);
-        console.error(`[Alfred] Completed stages:`, stages);
-        throw new Error(`Stage: ${stage.toUpperCase()}\nError: ${errorDetail}\nCompleted: ${stages.join(' → ')}`);
+        setGenerateStates((prev) => ({
+          ...prev,
+          [id]: { status: 'error', response: genData },
+        }));
+        return;
       }
 
-      if (genData.partial) {
-        setError(`⚠️ PARTIAL SUCCESS\n${genData.message}\n\nCompleted stages: ${(genData.stages || []).join(' → ')}`);
-      } else {
-        setError(`✅ SUCCESS! Video generated and posted to Instagram\n🔗 URL: ${genData.postUrl || genData.post_url || 'See dashboard'}\n⏰ Posted at: ${new Date().toLocaleTimeString()}`);
-      }
+      setGenerateStates((prev) => ({
+        ...prev,
+        [id]: { status: 'success', response: genData },
+      }));
+
       setTimeout(() => loadContent(), 2000);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       console.error('[Alfred] FULL ERROR:', errorMsg);
-      setError(`❌ FAILED\n${errorMsg}\n\n📋 Check browser console (F12) for full details`);
+      setGenerateStates((prev) => ({
+        ...prev,
+        [id]: { status: 'error', response: { error: errorMsg } },
+      }));
     }
   }
 
@@ -315,14 +318,20 @@ export function MarketingClient() {
                     disabled={updating[item.id]}
                     className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                   >
-                    {updating[item.id] ? 'Generating & Posting...' : 'Approve & Auto-Generate'}
+                    {updating[item.id] ? 'Updating...' : 'Approve'}
                   </button>
                 )}
 
                 {status === 'approved' && (
-                  <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 border border-blue-200">
-                    ✅ Video generated & posted!
-                  </div>
+                  <button
+                    onClick={() => generateAndPostVideo(item.id)}
+                    disabled={generateStates[item.id]?.status === 'running'}
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {generateStates[item.id]?.status === 'running'
+                      ? 'Generating & Posting...'
+                      : 'Generate & Post'}
+                  </button>
                 )}
 
                 {status === 'posted' && (item.platform_post_url || item.platform_post_id) && (
@@ -346,6 +355,29 @@ export function MarketingClient() {
                   </button>
                 )}
               </div>
+
+              {generateStates[item.id]?.status === 'running' && (
+                <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-700">
+                  ⏳ Generating video + posting... this can take 5-10 minutes.
+                </div>
+              )}
+
+              {generateStates[item.id]?.status && generateStates[item.id]?.status !== 'running' && (
+                <div
+                  className={`mt-4 rounded-lg border px-4 py-3 text-xs whitespace-pre-wrap ${
+                    generateStates[item.id]?.status === 'success'
+                      ? 'border-green-200 bg-green-50 text-green-700'
+                      : 'border-red-200 bg-red-50 text-red-700'
+                  }`}
+                >
+                  <div className="font-semibold mb-2">
+                    {generateStates[item.id]?.status === 'success' ? '✅ Generate & Post Success' : '❌ Generate & Post Failed'}
+                  </div>
+                  <pre className="text-[11px] leading-relaxed">
+                    {JSON.stringify(generateStates[item.id]?.response || {}, null, 2)}
+                  </pre>
+                </div>
+              )}
             </div>
           ))}
         </div>
