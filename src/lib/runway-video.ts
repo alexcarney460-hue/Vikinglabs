@@ -68,6 +68,7 @@ export async function generateVideoWithRunway(
     duration?: number;
     width?: number;
     height?: number;
+    promptImage?: string; // Public URL for an input image (required by some Runway models/endpoints)
   }
 ): Promise<RunwayGenerationResult> {
   try {
@@ -89,11 +90,15 @@ export async function generateVideoWithRunway(
     console.log('[runway-video] Duration:', duration, 'Ratio:', ratio);
 
     // Submit generation task (version header configurable; retry without it if rejected)
+    const promptImage = options?.promptImage || process.env.RUNWAY_PROMPT_IMAGE_URL;
+    console.log('[runway-video] promptImage:', promptImage ? 'provided' : 'MISSING');
+
     const submitBody = JSON.stringify({
       model: 'gen4.5',
       promptText: prompt,
       ratio,
       duration,
+      ...(promptImage ? { promptImage } : {}),
     });
 
     const { headers: submitHeaders, hasVersionHeader } = buildRunwayHeaders(apiKey, {
@@ -126,6 +131,16 @@ export async function generateVideoWithRunway(
     console.log('[runway-video] Task response body:', responseText);
 
     if (!taskResponse.ok) {
+      // Helpful hint: some Runway endpoints/models require an input image.
+      if (/promptImage/i.test(responseText) && !promptImage) {
+        return {
+          success: false,
+          error:
+            `Runway API error: ${taskResponse.status} - ${responseText}` +
+            ' (Hint: Runway requires promptImage; set RUNWAY_PROMPT_IMAGE_URL env or pass options.promptImage)',
+        };
+      }
+
       return {
         success: false,
         error: `Runway API error: ${taskResponse.status} - ${responseText}`,
