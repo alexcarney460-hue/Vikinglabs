@@ -107,6 +107,7 @@ export async function PATCH(req: NextRequest) {
 
 // POST /api/admin/marketing/content — Create new marketing content draft
 // Auth: Session-based OR credential header (for Mission Control)
+// Accepts full draft schema: platform, format, topic, hook, script, caption, hashtags, cta, compliance
 export async function POST(req: NextRequest) {
   try {
     // Check for credential header (for Mission Control)
@@ -131,10 +132,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     
-    // Validate required fields
+    // Validate required fields from schema
     const requiredFields = ['platform', 'hook', 'caption', 'hashtags'];
     for (const field of requiredFields) {
-      if (!body[field]) {
+      if (body[field] === null || body[field] === undefined || body[field] === '') {
         return NextResponse.json(
           { error: `Missing required field: ${field}` },
           { status: 400 }
@@ -142,28 +143,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const supabase = getSupabaseServer();
-    
-    // Generate UUID using crypto
-    const contentId = crypto.randomUUID();
-    const now = new Date().toISOString();
+    // Validate platform
+    if (!['tiktok', 'instagram'].includes(body.platform)) {
+      return NextResponse.json(
+        { error: 'Invalid platform. Must be "tiktok" or "instagram"' },
+        { status: 400 }
+      );
+    }
 
+    const supabase = getSupabaseServer();
+
+    // Construct full draft object according to schema
     const newContent = {
-      id: contentId,
       platform: body.platform,
       format: body.format || 'reel',
+      topic: body.topic || 'General',
       hook: body.hook,
+      script: Array.isArray(body.script) ? body.script : [body.script || ''],
       caption: body.caption,
-      hashtags: body.hashtags,
+      hashtags: Array.isArray(body.hashtags) ? body.hashtags : [body.hashtags || ''],
+      cta: body.cta || 'Learn more',
       compliance: body.compliance || {
         risk_score: 0,
         flags: [],
         notes: 'Auto-created via Mission Control'
       },
-      status: 'draft',
-      created_at: now,
-      updated_at: now,
-      created_by: user.email || 'system'
+      status: 'draft'
     };
 
     const { data, error } = await supabase
@@ -182,6 +187,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { 
         success: true, 
+        id: data?.[0]?.id,
         data: data?.[0],
         message: 'Draft created successfully'
       },
